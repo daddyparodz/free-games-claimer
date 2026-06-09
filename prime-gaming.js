@@ -86,6 +86,24 @@ const redeem = {
   'legacy games': 'https://www.legacygames.com/primedeal',
 };
 
+const isAlreadyRedeemed = status => ['claimed and redeemed', 'claimed and redeemed?'].includes(status);
+
+const isGenericLegacyRedeemUrl = redeem_url => {
+  if (!redeem_url) return true;
+  const url = new URL(redeem_url, 'https://www.legacygames.com');
+  return url.hostname == 'www.legacygames.com' && ['/', '/primedeal', '/primedeal/'].includes(url.pathname);
+};
+
+const getLegacyRedeemUrl = async page => {
+  const legacyLink = page.locator([
+    'li:has-text("Click here") a',
+    'a[href*="promo.legacygames.com"]',
+    'a[href*="legacygames.com"]:has-text("Click here")',
+    'a[href*="legacygames.com"]:has-text("redeem")',
+  ].join(', ')).first();
+  return await legacyLink.getAttribute('href').catch(_ => undefined);
+};
+
 const redeemStatus = action => {
   if (action == 'redeemed' || action == 'already redeemed') return 'claimed and redeemed';
   if (action == 'redeemed?') return 'claimed and redeemed?';
@@ -153,6 +171,11 @@ const waitForGogManualRedeem = async page => {
 const redeemCode = async (context, store, code, redeem_url = redeem[store], title) => {
   let redeem_action = 'redeem';
   console.log(`  Trying to redeem ${code} on ${store} (need to be logged in)!`);
+  if (store == 'legacy games' && isGenericLegacyRedeemUrl(redeem_url)) {
+    redeem_action = 'redeem (missing legacy URL)';
+    console.error('  Missing game-specific Legacy Games redeem URL; skipping generic legacygames.com page.');
+    return { action: redeem_action, status: redeemStatus(redeem_action), redeem_url };
+  }
   const page2 = await context.newPage();
   try {
     await page2.goto(redeem_url, { waitUntil: 'domcontentloaded' });
@@ -247,6 +270,7 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
       if (await page2.locator('[name=email]').count()) {
         if (!cfg.lg_email) {
           console.error('  Legacy Games redemption requires LG_EMAIL, PG_EMAIL, or EMAIL to be configured.');
+          await notify(`prime-gaming: Legacy Games redemption for ${title} needs LG_EMAIL, PG_EMAIL, or EMAIL because the promo form still asks for an email.`).catch(_ => { });
           redeem_action = 'redeem (missing email)';
           return { action: redeem_action, status: redeemStatus(redeem_action), redeem_url };
         }
@@ -478,12 +502,13 @@ try {
         console.log('  Code to redeem game:', chalk.blue(code));
         let redeem_url = db.data[user][title].redeem_url || redeem[store];
         if (store == 'legacy games') { // may be different URL like https://legacygames.com/primeday/puzzleoftheyear/
-          redeem_url = await (await page.$('li:has-text("Click here") a')).getAttribute('href'); // full text: Click here to enter your redemption code.
+          redeem_url = await getLegacyRedeemUrl(page) || redeem_url; // full text may be: Click here to enter your redemption code.
         }
         const notify_redeem_url = store == 'gog.com' ? `${redeem_url}/${code}` : redeem_url; // can't use GOG URL for goto below (captcha)
         console.log('  URL to redeem game:', notify_redeem_url);
         db.data[user][title].code = code;
         db.data[user][title].redeem_url = redeem_url;
+        await db.write();
         let redeem_action = 'redeem';
         if (cfg.pg_redeem) { // try to redeem keys on external stores
           try {
@@ -491,9 +516,11 @@ try {
             redeemed_codes.add(code);
             redeem_action = redeemed.action;
             db.data[user][title].status = redeemed.status;
+            await db.write();
           } catch (error) {
             redeem_action = 'redeem (failed)';
             console.error('  Redeem failed:', error.message);
+            await db.write();
           }
         }
         notify_game.status = `<a href="${notify_redeem_url}">${redeem_action}</a> ${code} on ${store}`;
@@ -509,28 +536,32 @@ try {
   }
   if (cfg.pg_redeem) {
     const pending = Object.values(db.data[user])
-      .filter(game => game.code && !redeemed_codes.has(game.code) && game.store in redeem && !['claimed and redeemed', 'claimed and redeemed?'].includes(game.status));
+      .filter(game => game.code && !redeemed_codes.has(game.code) && game.store in redeem && !isAlreadyRedeemed(game.status));
     if (pending.length) console.log(`\nTrying to redeem ${pending.length} stored Prime Gaming code(s)...`);
     for (const game of pending) {
       console.log('Stored code:', chalk.blue(game.title), `(${game.store})`);
       let redeem_url = game.redeem_url || redeem[game.store];
-      if (game.store == 'legacy games' && !game.redeem_url && game.url) {
+      if (game.store == 'legacy games' && isGenericLegacyRedeemUrl(redeem_url) && game.url) {
         const primePage = await context.newPage();
         try {
           await primePage.goto(game.url, { waitUntil: 'domcontentloaded' });
           await throwIfPrimeErrorPage(primePage);
-          redeem_url = await primePage.locator('li:has-text("Click here") a').first().getAttribute('href').catch(_ => redeem_url);
+          redeem_url = await getLegacyRedeemUrl(primePage) || redeem_url;
         } finally {
           await primePage.close();
         }
       }
       game.redeem_url = redeem_url;
+      await db.write();
       try {
         const redeemed = await redeemCode(context, game.store, game.code, redeem_url, game.title);
         redeemed_codes.add(game.code);
         game.status = redeemed.status;
+        game.redeem_url = redeemed.redeem_url;
+        await db.write();
       } catch (error) {
         console.error('  Redeem failed:', error.message);
+        await db.write();
       }
     }
   }
