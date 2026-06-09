@@ -43,8 +43,9 @@ try {
   await page.goto(URL_CLAIM, { waitUntil: 'domcontentloaded' }); // default 'load' takes forever
 
   // page.click('#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll').catch(_ => { }); // does not work reliably, solved by setting CookieConsent above
-  const signIn = page.locator('a:has-text("Sign in")').first();
-  await Promise.any([signIn.waitFor(), page.waitForSelector('#menuUsername')]);
+  const signIn = page.locator('[hook-test="menuAnonymousButton"]:visible, [hook-test="menuLogin"]:visible, [hook-test="menuLoginMobile"]:visible, a:has-text("Sign in"):visible').first();
+  const account = page.locator('#menuUsername:visible, [hook-test="menuAccountButton"]:visible').first();
+  await Promise.any([signIn.waitFor(), account.waitFor()]);
   while (await signIn.isVisible()) {
     console.error('Not signed in anymore.');
     await signIn.click();
@@ -78,7 +79,7 @@ try {
         notify('gog: got captcha during login. Please check.');
         // TODO solve reCAPTCHA?
       }).catch(_ => { });
-      await page.waitForSelector('#menuUsername');
+      await account.waitFor();
     } else {
       console.log('Waiting for you to login in the browser.');
       await notify('gog: no longer signed in and not enough options set for automatic login.');
@@ -88,10 +89,17 @@ try {
         process.exit(1);
       }
     }
-    await page.waitForSelector('#menuUsername');
+    await account.waitFor();
     if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
   }
-  user = await page.locator('#menuUsername').first().textContent(); // innerText is uppercase due to styling!
+  user = await page.locator('#menuUsername').first().textContent().catch(_ => undefined); // innerText is uppercase due to styling!
+  if (!user?.trim()) {
+    const profileUrl = await page.locator('[hook-test="menuAccountProfile"]').first().getAttribute('href').catch(_ => undefined);
+    const profileName = profileUrl?.split('/').filter(Boolean).pop();
+    user = profileName && profileName != 'u'
+      ? profileName
+      : Object.keys(db.data).find(name => name != 'u') || 'gog-account';
+  }
   console.log(`Signed in as ${user}`);
   db.data[user] ||= {};
 
