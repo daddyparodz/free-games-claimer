@@ -114,8 +114,14 @@ const storeFromItemDetails = item_text => item_text.toLowerCase().replace(/.* on
 const redeemStatus = action => {
   if (action == 'redeemed' || action == 'already redeemed') return 'claimed and redeemed';
   if (action == 'redeemed?') return 'claimed and redeemed?';
+  if (action == 'redeem (not found)') return 'failed: code not found';
+  if (action == 'redeem (missing legacy URL)') return 'failed: missing legacy redeem URL';
+  if (action == 'redeem (legacy page not found)') return 'failed: legacy page unavailable';
+  if (action == 'redeem (legacy form missing)') return 'failed: legacy form missing';
   return 'claimed';
 };
+
+const isTerminalRedeemStatus = status => isAlreadyRedeemed(status) || status?.startsWith('failed:');
 
 const notifyGogCaptchaNeeded = async title => {
   const suffix = title ? ` for ${title}` : '';
@@ -273,7 +279,14 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
       }
     } else if (store == 'legacy games') {
       // await page2.pause();
-      await page2.fill('[name=coupon_code]', code);
+      const coupon = page2.locator('[name=coupon_code]').first();
+      if (!await coupon.isVisible().catch(_ => false)) {
+        const body = await page2.locator('body').innerText().catch(_ => '');
+        redeem_action = /404|couldn.t be found|page.*not found/i.test(body) ? 'redeem (legacy page not found)' : 'redeem (legacy form missing)';
+        console.error(`  Legacy Games redeem form unavailable: ${redeem_action}`);
+        return { action: redeem_action, status: redeemStatus(redeem_action), redeem_url };
+      }
+      await coupon.fill(code);
       if (await page2.locator('[name=email]').count()) {
         if (!cfg.lg_email) {
           console.error('  Legacy Games redemption requires LG_EMAIL, PG_EMAIL, or EMAIL to be configured.');
@@ -288,8 +301,23 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
       await page2.click('[type="submit"]');
       try {
         // await page2.waitForResponse(r => r.url().startsWith('https://promo.legacygames.com/promotion-processing/order-management.php')); // status code 302
-        await page2.waitForSelector('h2:has-text("Thanks for redeeming")');
-        redeem_action = 'redeemed';
+        await Promise.race([
+          page2.waitForSelector('h2:has-text("Thanks for redeeming")'),
+          page2.waitForTimeout(15000),
+        ]);
+        const body = await page2.locator('body').innerText().catch(_ => '');
+        if (await page2.locator('h2:has-text("Thanks for redeeming")').count()) {
+          redeem_action = 'redeemed';
+        } else if (/already.*redeem|already.*used/i.test(body)) {
+          redeem_action = 'already redeemed';
+          console.log('  Code was already used!');
+        } else if (/404|couldn.t be found|page.*not found/i.test(body)) {
+          redeem_action = 'redeem (legacy page not found)';
+          console.error('  Legacy Games promo page returned 404 after submit.');
+        } else {
+          redeem_action = 'redeemed?';
+          console.log('  Redeemed successfully? Please report problems in https://github.com/vogler/free-games-claimer/issues/5');
+        }
       } catch (error) {
         console.error('  Got error', error);
         redeem_action = 'redeemed?';
@@ -545,7 +573,7 @@ try {
   }
   if (cfg.pg_redeem) {
     const pending = Object.values(db.data[user])
-      .filter(game => game.code && !redeemed_codes.has(game.code) && game.store in redeem && !isAlreadyRedeemed(game.status));
+      .filter(game => game.code && !redeemed_codes.has(game.code) && game.store in redeem && !isTerminalRedeemStatus(game.status));
     if (pending.length) console.log(`\nTrying to redeem ${pending.length} stored Prime Gaming code(s)...`);
     for (const game of pending) {
       console.log('Stored code:', chalk.blue(game.title), `(${game.store})`);
