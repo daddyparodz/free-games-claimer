@@ -11,7 +11,12 @@ const URL_CLAIM = 'https://gaming.amazon.com/home';
 
 const offerUrl = (href, baseUrl = URL_CLAIM) => {
   if (!href) throw new Error('Prime Gaming offer link is missing an href');
+  const base = new URL(baseUrl);
   const url = new URL(href, baseUrl);
+  if (base.hostname.startsWith('luna.amazon.') && url.hostname == 'gaming.amazon.com') {
+    url.protocol = base.protocol;
+    url.hostname = base.hostname;
+  }
   url.pathname = url.pathname.replace(/\/{2,}/g, '/').replace(/^\/claims\/claims(?=\/)/, '/claims');
   const isLunaItemPath = (/\/dp\/amzn1\.pg\.item\./).test(url.pathname);
   if (url.hostname.startsWith('luna.amazon.') && isLunaItemPath && !url.pathname.startsWith('/claims/')) {
@@ -103,6 +108,8 @@ const getLegacyRedeemUrl = async page => {
   ].join(', ')).first();
   return await legacyLink.getAttribute('href').catch(_ => undefined);
 };
+
+const storeFromItemDetails = item_text => item_text.toLowerCase().replace(/.* on /, '').slice(0, -1);
 
 const redeemStatus = action => {
   if (action == 'redeemed' || action == 'already redeemed') return 'claimed and redeemed';
@@ -475,13 +482,15 @@ try {
     await throwIfPrimeErrorPage(page);
     if (cfg.debug) await page.pause();
     const item_text = await page.innerText('[data-a-target="DescriptionItemDetails"]');
-    const store = item_text.toLowerCase().replace(/.* on /, '').slice(0, -1);
+    const store = storeFromItemDetails(item_text);
     console.log('  External store:', store);
     if (cfg.pg_timeLeft && await skipBasedOnTime(url)) continue;
     if (cfg.dryrun) continue;
     if (cfg.interactive && !await confirm()) continue;
     await claimExternalOffer(page);
     db.data[user][title] ||= { title, time: datetime(), url, store };
+    db.data[user][title].url = url;
+    db.data[user][title].store = store;
     const notify_game = { title, url };
     notify_games.push(notify_game); // status is updated below
     if (await page.locator('div:has-text("Link game account")').count() // TODO still needed? epic games store just has 'Link account' as the button text now.
@@ -540,13 +549,25 @@ try {
     if (pending.length) console.log(`\nTrying to redeem ${pending.length} stored Prime Gaming code(s)...`);
     for (const game of pending) {
       console.log('Stored code:', chalk.blue(game.title), `(${game.store})`);
+      if (game.url) game.url = offerUrl(game.url, page.url());
       let redeem_url = game.redeem_url || redeem[game.store];
-      if (game.store == 'legacy games' && isGenericLegacyRedeemUrl(redeem_url) && game.url) {
+      if (game.url && (game.store == 'legacy games' && isGenericLegacyRedeemUrl(redeem_url) || !game.store || !(game.store in redeem))) {
         const primePage = await context.newPage();
         try {
           await primePage.goto(game.url, { waitUntil: 'domcontentloaded' });
           await throwIfPrimeErrorPage(primePage);
-          redeem_url = await getLegacyRedeemUrl(primePage) || redeem_url;
+          const item_text = await primePage.locator('[data-a-target="DescriptionItemDetails"]').innerText().catch(_ => undefined);
+          if (item_text) {
+            const actualStore = storeFromItemDetails(item_text);
+            if (actualStore in redeem && actualStore != game.store) {
+              console.log(`  Correcting stored external store from ${game.store} to ${actualStore}.`);
+              game.store = actualStore;
+              redeem_url = redeem[game.store];
+            }
+          }
+          if (game.store == 'legacy games') redeem_url = await getLegacyRedeemUrl(primePage) || redeem_url;
+        } catch (error) {
+          console.error('  Could not refresh stored Prime offer page:', error.message);
         } finally {
           await primePage.close();
         }
