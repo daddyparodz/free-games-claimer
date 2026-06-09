@@ -23,7 +23,7 @@ Raspberry Pi (3, 4, Zero 2): [requires 64-bit OS](https://github.com/vogler/free
 ## How to run
 Easy option: [install Docker](https://docs.docker.com/get-docker/) (or [podman](https://podman-desktop.io/)) and run this command in a terminal:
 ```
-docker run --rm -it -p 6080:6080 -v fgc:/fgc/data --pull=always ghcr.io/vogler/free-games-claimer
+docker run --rm -it -p 6080:6080 -v fgc:/fgc/data --pull=always ghcr.io/daddyparodz/free-games-claimer
 ```
 
 _This currently gives you a captcha challenge for epic-games. Until [issue #183](https://github.com/vogler/free-games-claimer/issues/183) is fixed, it is recommended to just run `node epic-games` without docker (see below)._
@@ -84,6 +84,7 @@ Available options/variables and their default values:
 | EG_PASSWORD   	|         	| Epic Games password for login. Overrides PASSWORD.                     	|
 | EG_OTPKEY     	|         	| Epic Games MFA OTP key.                                                	|
 | EG_PARENTALPIN 	|         	| Epic Games Parental Controls PIN.                                      	|
+| EG_COUNTRY     	| US      	| Epic Games country code for free-games promotion lookup.                	|
 | PG_EMAIL      	|         	| Prime Gaming email for login. Overrides EMAIL.                         	|
 | PG_PASSWORD   	|         	| Prime Gaming password for login. Overrides PASSWORD.                   	|
 | PG_OTPKEY     	|         	| Prime Gaming MFA OTP key.                                              	|

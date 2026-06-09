@@ -20,21 +20,23 @@ const execp = cmd => new Promise((resolve, reject) => {
 
 // const git_main = () => readFileSync('.git/refs/heads/main').toString().trim();
 
-let sha, date;
+let sha, date, branch;
 // if (existsSync('/.dockerenv')) { // did not work
 if (process.env.NOVNC_PORT) {
   log('Running inside Docker.');
   ['COMMIT', 'BRANCH', 'NOW'].forEach(v => log(`  ${v}:`, process.env[v]));
   sha = process.env.COMMIT;
+  branch = process.env.BRANCH || 'main';
   date = process.env.NOW;
 } else {
   log('Not running inside Docker.');
   sha = await execp('git rev-parse HEAD');
+  branch = await execp('git rev-parse --abbrev-ref HEAD');
   date = await execp('git show -s --format=%cD'); // same as format as `date -R` (RFC2822)
   // date = await execp('git show -s --format=%ch'); // %ch is same as --date=human (short/relative)
 }
 
-const gh = await (await fetch('https://api.github.com/repos/vogler/free-games-claimer/commits/main', {
+const gh = await (await fetch(`https://api.github.com/repos/daddyparodz/free-games-claimer/commits/${branch}`, {
   // headers: { accept: 'application/vnd.github.VERSION.sha' }
 })).json();
 // log(gh);

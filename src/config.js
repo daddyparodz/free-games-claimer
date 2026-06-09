@@ -33,6 +33,7 @@ export const cfg = {
   eg_password: process.env.EG_PASSWORD || process.env.PASSWORD,
   eg_otpkey: process.env.EG_OTPKEY,
   eg_parentalpin: process.env.EG_PARENTALPIN,
+  eg_country: process.env.EG_COUNTRY || process.env.COUNTRY || 'US', // used by Epic's promotions API
   // auth prime-gaming
   pg_email: process.env.PG_EMAIL || process.env.EMAIL,
   pg_password: process.env.PG_PASSWORD || process.env.PASSWORD,
