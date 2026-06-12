@@ -35,8 +35,6 @@ const throwIfPrimeErrorPage = async page => {
 
 const claimExternalOffer = async page => {
   const resultSelectors = [
-    'div:has-text("Link game account")',
-    'div:has-text("Link account")',
     '.thank-you-title:has-text("Success")',
     '[data-a-target="ClaimStateClaimCodeContent"]',
     'input[type="text"]',
@@ -89,6 +87,22 @@ const redeem = {
   'microsoft store': 'https://account.microsoft.com/billing/redeem',
   xbox: 'https://account.microsoft.com/billing/redeem',
   'legacy games': 'https://www.legacygames.com/primedeal',
+};
+
+const isExternalClaimSuccess = async page => await page.locator([
+  '.thank-you-title:has-text("Success")',
+  'text=/will be available to play from your .* library/i',
+  'text=/successfully claimed/i',
+].join(', ')).first().isVisible().catch(_ => false);
+
+const isAccountLinkingRequired = async page => {
+  if (await isExternalClaimSuccess(page)) return false;
+  return await page.locator([
+    'button:has-text("Link game account")',
+    'button:has-text("Link account")',
+    '[data-a-target="LinkAccountButton"]',
+    '[data-a-target="LinkAccountModal"] button',
+  ].join(', ')).first().isVisible().catch(_ => false);
 };
 
 const isAlreadyRedeemed = status => ['claimed and redeemed', 'claimed and redeemed?'].includes(status);
@@ -521,8 +535,7 @@ try {
     db.data[user][title].store = store;
     const notify_game = { title, url };
     notify_games.push(notify_game); // status is updated below
-    if (await page.locator('div:has-text("Link game account")').count() // TODO still needed? epic games store just has 'Link account' as the button text now.
-       || await page.locator('div:has-text("Link account")').count()) {
+    if (await isAccountLinkingRequired(page)) {
       console.error('  Account linking is required to claim this offer!');
       notify_game.status = `failed: need account linking for ${store}`;
       db.data[user][title].status = 'failed: need account linking';
