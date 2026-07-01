@@ -95,6 +95,36 @@ const isExternalClaimSuccess = async page => await page.locator([
   'text=/successfully claimed/i',
 ].join(', ')).first().isVisible().catch(_ => false);
 
+const isInternalClaimSuccess = async page => await page.locator([
+  'text=/will be available to play from your .* library/i',
+  'text=/you collected this on/i',
+  'text=/sent to your .* library/i',
+  'text=/collected on/i',
+].join(', ')).first().isVisible().catch(_ => false);
+
+const claimInternalOffer = async (page, url) => {
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  await throwIfPrimeErrorPage(page);
+  if (await isInternalClaimSuccess(page)) return 'existed';
+  const action = page.locator([
+    'button[data-a-target="buy-box_call-to-action"]:has-text("Get game")',
+    'button[data-a-target="buy-box_call-to-action"]:has-text("Claim game")',
+    'button[data-a-target="buy-box_call-to-action"]:has-text("Claim")',
+    '[data-a-target="buy-box"] .tw-button:has-text("Get game")',
+    '[data-a-target="buy-box"] .tw-button:has-text("Claim game")',
+    '[data-a-target="buy-box"] .tw-button:has-text("Claim")',
+  ].join(', ')).first();
+  if (!await action.isVisible().catch(_ => false)) return 'failed';
+  await action.click();
+  await page.waitForLoadState('networkidle').catch(_ => { });
+  await Promise.race([
+    page.waitForURL(/\/details(\?|$)/).catch(_ => { }),
+    page.waitForTimeout(5000),
+  ]);
+  await page.waitForTimeout(1000);
+  return await isInternalClaimSuccess(page) ? 'claimed' : 'failed';
+};
+
 const isAccountLinkingRequired = async page => {
   if (await isExternalClaimSuccess(page)) return false;
   return await page.locator([
@@ -465,7 +495,7 @@ try {
   await scrollUntilStable(() => page.evaluate(() => document.querySelector('.tw-full-width').scrollHeight)); // height may change during loading while number of games is still the same?
   console.log('Number of already claimed games (total):', await games.locator('p:has-text("Collected")').count());
   // can't use .all() since the list of elements via locator will change after click while we iterate over it
-  const internal = await games.locator('.item-card__action:has(button[data-a-target="FGWPOffer"])').elementHandles();
+  const internal = await games.locator('.item-card__action:has(button[data-a-target="FGWPOffer"])').all();
   const external = await games.locator('.item-card__action:has(a[data-a-target="FGWPOffer"])').all();
   // bottom to top: oldest to newest games
   internal.reverse();
@@ -489,26 +519,14 @@ try {
     if (isNew) await p.close();
     return daysLeft > cfg.pg_timeLeft;
   }
-  console.log('\nNumber of free unclaimed games (Prime Gaming):', internal.length);
-  // claim games in internal store
+  const internal_info = [];
   for (const card of internal) {
     await card.scrollIntoViewIfNeeded();
-    const title = await (await card.$('.item-card-details__body__primary')).innerText();
-    const slug = await (await card.$('a')).getAttribute('href');
+    const title = await card.locator('.item-card-details__body__primary').innerText();
+    const slug = await card.locator('a').first().getAttribute('href');
     const url = offerUrl(slug, page.url());
-    console.log('Current free game:', chalk.blue(title));
-    if (cfg.pg_timeLeft && await skipBasedOnTime(url)) continue;
-    if (cfg.dryrun) continue;
-    if (cfg.interactive && !await confirm()) continue;
-    await (await card.$('.tw-button:has-text("Claim"), .tw-button:has-text("Claim game"), button:has-text("Claim"), button:has-text("Claim game")')).click();
-    db.data[user][title] ||= { title, time: datetime(), url, store: 'internal' };
-    notify_games.push({ title, status: 'claimed', url });
-    // const img = await (await card.$('img.tw-image')).getAttribute('src');
-    // console.log('Image:', img);
-    await card.screenshot({ path: screenshot('internal', `${filenamify(title)}.png`) });
+    internal_info.push({ title, url });
   }
-  console.log('\nNumber of free unclaimed games (external stores):', external.length);
-  // claim games in external/linked stores. Linked: origin.com, epicgames.com; Redeem-key: gog.com, legacygames.com, microsoft
   const external_info = [];
   for (const card of external) { // need to get data incl. URLs in this loop and then navigate in another, otherwise .all() would update after coming back and .elementHandles() like above would lead to error due to page navigation: elementHandle.$: Protocol error (Page.adoptNode)
     const title = await card.locator('.item-card-details__body__primary').innerText();
@@ -517,6 +535,37 @@ try {
     // await (await card.$('text=Claim')).click(); // goes to URL of game, no need to wait
     external_info.push({ title, url });
   }
+  console.log('\nNumber of free unclaimed games (Prime Gaming):', internal_info.length);
+  // claim games in internal store
+  for (const { title, url } of internal_info) {
+    console.log('Current free game:', chalk.blue(title));
+    if (cfg.pg_timeLeft && await skipBasedOnTime(url)) continue;
+    if (cfg.dryrun) continue;
+    if (cfg.interactive && !await confirm()) continue;
+    const claimStatus = await claimInternalOffer(page, url);
+    db.data[user][title] ||= { title, time: datetime(), url, store: 'internal' };
+    db.data[user][title].url = url;
+    db.data[user][title].store = 'internal';
+    if (claimStatus == 'claimed') {
+      db.data[user][title].time = datetime();
+      db.data[user][title].status = 'claimed';
+      notify_games.push({ title, status: 'claimed', url });
+    } else if (claimStatus == 'existed') {
+      console.log('  Already collected! Nothing to claim.');
+      if (db.data[user][title].status?.startsWith('failed:')) db.data[user][title].status = 'claimed';
+      else db.data[user][title].status ||= 'claimed';
+    } else {
+      console.error('  Claim was not confirmed by Prime Gaming!');
+      const wasFailed = db.data[user][title].status?.startsWith('failed:');
+      db.data[user][title].status = 'failed: claim not confirmed';
+      if (!wasFailed) notify_games.push({ title, status: 'failed: claim not confirmed', url });
+    }
+    // const img = await (await card.$('img.tw-image')).getAttribute('src');
+    // console.log('Image:', img);
+    await page.screenshot({ path: screenshot('internal', `${filenamify(title)}.png`), fullPage: true });
+  }
+  console.log('\nNumber of free unclaimed games (external stores):', external_info.length);
+  // claim games in external/linked stores. Linked: origin.com, epicgames.com; Redeem-key: gog.com, legacygames.com, microsoft
   // external_info = [ { title: 'Fallout 76 (XBOX)', url: 'https://gaming.amazon.com/fallout-76-xbox-fgwp/dp/amzn1.pg.item.9fe17d7b-b6c2-4f58-b494-cc4e79528d0b?ingress=amzn&ref_=SM_Fallout76XBOX_S01_FGWP_CRWN' } ];
   for (const { title, url } of external_info) {
     console.log('Current free game:', chalk.blue(title)); // , url);
