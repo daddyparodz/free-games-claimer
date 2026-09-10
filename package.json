@@ -13,7 +13,8 @@
   "scripts": {
     "docker:build": "docker build . -t ghcr.io/daddyparodz/free-games-claimer",
     "docker": "cross-env-shell docker run --rm -it -p 5900:5900 -p 6080:6080 -v \\\"$INIT_CWD/data\\\":/fgc/data --name fgc ghcr.io/daddyparodz/free-games-claimer",
-    "lint": "npx eslint ."
+    "lint": "npx eslint .",
+    "test": "node --test test/page-state.test.js"
   },
   "type": "module",
   "engines": {

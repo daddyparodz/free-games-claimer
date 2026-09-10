@@ -5,6 +5,7 @@ import path from 'path';
 import { existsSync, writeFileSync, appendFileSync } from 'fs';
 import { resolve, jsonDb, datetime, stealth, filenamify, prompt, notify, html_game_list, handleSIGINT } from './src/util.js';
 import { cfg } from './src/config.js';
+import { waitForEpicClaimSuccess } from './src/page-state.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
 
@@ -371,13 +372,10 @@ try {
           console.error('  Failed to challenge captcha, please try again later.');
           await notify('epic-games: failed to challenge captcha. Please check.');
         }).catch(_ => { });
-        await Promise.any([
-          page.locator('text=It\'s all yours').waitFor({ state: 'attached' }),
-          page.locator('text=Thanks for your order!').waitFor({ state: 'attached' }),
-        ]); // TODO Bundle: got stuck here, but normal game now as well
+        const successState = await waitForEpicClaimSuccess(page, cfg.timeout);
         db.data[user][game_id].status = 'claimed';
         db.data[user][game_id].time = datetime(); // claimed time overwrites failed/dryrun time
-        console.log('  Claimed successfully!');
+        console.log(`  Claimed successfully! (${successState})`);
         // context.setDefaultTimeout(cfg.timeout);
       } catch (e) {
         console.log(e);

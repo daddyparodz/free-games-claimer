@@ -2,6 +2,7 @@ import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdate
 import chalk from 'chalk';
 import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, handleSIGINT } from './src/util.js';
 import { cfg } from './src/config.js';
+import { getGogSession, waitForGogSession } from './src/page-state.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'gog', ...a);
 
@@ -44,10 +45,14 @@ try {
 
   // page.click('#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll').catch(_ => { }); // does not work reliably, solved by setting CookieConsent above
   const signIn = page.locator('[hook-test="menuAnonymousButton"]:visible, [hook-test="menuLogin"]:visible, [hook-test="menuLoginMobile"]:visible, a:has-text("Sign in"):visible').first();
-  const account = page.locator('#menuUsername:visible, [hook-test="menuAccountButton"]:visible').first();
-  await Promise.any([signIn.waitFor(), account.waitFor()]);
-  while (await signIn.isVisible()) {
+  let loginState = await getGogSession(context, Math.min(cfg.timeout, 15_000));
+  while (!loginState.isLoggedIn) {
     console.error('Not signed in anymore.');
+    try {
+      await signIn.waitFor({ state: 'visible', timeout: Math.min(cfg.timeout, 15_000) });
+    } catch (cause) {
+      throw new Error('GOG reports a signed-out session, but its Sign in control did not become visible', { cause });
+    }
     await signIn.click();
     // it then creates an iframe for the login
     await page.waitForSelector('#GalaxyAccountsFrameContainer iframe'); // TODO needed?
@@ -79,7 +84,6 @@ try {
         notify('gog: got captcha during login. Please check.');
         // TODO solve reCAPTCHA?
       }).catch(_ => { });
-      await account.waitFor();
     } else {
       console.log('Waiting for you to login in the browser.');
       await notify('gog: no longer signed in and not enough options set for automatic login.');
@@ -89,10 +93,10 @@ try {
         process.exit(1);
       }
     }
-    await account.waitFor();
+    loginState = await waitForGogSession(context, cfg.login_timeout);
     if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
   }
-  user = await page.locator('#menuUsername').first().textContent().catch(_ => undefined); // innerText is uppercase due to styling!
+  user = loginState.username || await page.locator('#menuUsername').first().textContent().catch(_ => undefined); // innerText is uppercase due to styling!
   if (!user?.trim()) {
     const profileUrl = await page.locator('[hook-test="menuAccountProfile"]').first().getAttribute('href').catch(_ => undefined);
     const profileName = profileUrl?.split('/').filter(Boolean).pop();

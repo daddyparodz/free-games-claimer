@@ -415,7 +415,11 @@ let user;
 try {
   await page.goto(URL_CLAIM, { waitUntil: 'domcontentloaded' }); // default 'load' takes forever
   // need to wait for some elements to exist before checking if signed in or accepting cookies:
-  await Promise.any(['button:has-text("Sign in")', '[data-a-target="user-dropdown-first-name-text"]'].map(s => page.waitForSelector(s)));
+  try {
+    await page.locator('button:has-text("Sign in"), [data-a-target="user-dropdown-first-name-text"]').first().waitFor({ state: 'visible' });
+  } catch (cause) {
+    throw new Error('Prime Gaming did not show either a signed-in user or a Sign in button', { cause });
+  }
   page.click('[aria-label="Cookies usage disclaimer banner"] button:has-text("Accept Cookies")').catch(_ => { }); // to not waste screen space when non-headless, TODO does not work reliably, need to wait for something else first?
   while (await page.locator('button:has-text("Sign in")').count() > 0) {
     console.error('Not signed in anymore.');
@@ -609,7 +613,9 @@ try {
       db.data[user][title].status = 'claimed';
       // print code if there is one
       if (store in redeem) { // did not work for linked origin: && !await page.locator('div:has-text("Successfully Claimed")').count()
-        const code = await Promise.any([page.inputValue('input[type="text"]'), page.textContent('[data-a-target="ClaimStateClaimCodeContent"]').then(s => s.replace('Your code: ', ''))]); // input: Legacy Games; text: gog.com
+        let code = await page.inputValue('input[type="text"]').catch(_ => undefined); // Legacy Games
+        code ||= await page.textContent('[data-a-target="ClaimStateClaimCodeContent"]').then(s => s.replace('Your code: ', '')).catch(_ => undefined); // GOG
+        if (!code) throw new Error(`Prime Gaming did not expose a claim code for ${title}`);
         console.log('  Code to redeem game:', chalk.blue(code));
         let redeem_url = db.data[user][title].redeem_url || redeem[store];
         if (store == 'legacy games') { // may be different URL like https://legacygames.com/primeday/puzzleoftheyear/
@@ -738,8 +744,13 @@ try {
         await throwIfPrimeErrorPage(page);
         // most games have a button 'Get in-game content'
         // epic-games: Fall Guys: Claim -> Continue -> Go to Epic Games (despite account linked and logged into epic-games) -> not tied to account but via some cookie?
-        await Promise.any([page.click('.tw-button:has-text("Get in-game content")'), page.click('.tw-button:has-text("Claim your gift")'), page.click('.tw-button:has-text("Claim")').then(() => page.click('button:has-text("Continue")'))]);
-        page.click('button:has-text("Continue")').catch(_ => { });
+        const dlcAction = page.locator('.tw-button:has-text("Get in-game content"), .tw-button:has-text("Claim your gift"), .tw-button:has-text("Claim")').first();
+        if (!await dlcAction.isVisible().catch(_ => false)) throw new Error(`Prime Gaming did not show a DLC claim action for ${title}`);
+        const needsContinue = (/^claim$/i).test((await dlcAction.innerText()).trim());
+        await dlcAction.click();
+        const continueButton = page.locator('button:has-text("Continue")').first();
+        if (needsContinue) await continueButton.click();
+        else await continueButton.click({ timeout: 5000 }).catch(_ => { });
         const linkAccountButton = page.locator('[data-a-target="LinkAccountButton"]');
         let unlinked_store;
         if (await linkAccountButton.count()) {
