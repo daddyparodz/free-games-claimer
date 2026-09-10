@@ -102,6 +102,12 @@ const isInternalClaimSuccess = async page => await page.locator([
   'text=/collected on/i',
 ].join(', ')).first().isVisible().catch(_ => false);
 
+// Older versions stored internal claims without a status. Treat those records as
+// already reported too, otherwise a stale Prime card can generate the same
+// "claimed" notification on every scheduled run.
+const wasInternalClaimAlreadyReported = game => game?.store == 'internal'
+  && (!game.status || game.status == 'claimed');
+
 const claimInternalOffer = async (page, url) => {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await throwIfPrimeErrorPage(page);
@@ -542,14 +548,20 @@ try {
     if (cfg.pg_timeLeft && await skipBasedOnTime(url)) continue;
     if (cfg.dryrun) continue;
     if (cfg.interactive && !await confirm()) continue;
+    const previousGame = db.data[user][title];
+    const alreadyReported = wasInternalClaimAlreadyReported(previousGame);
     const claimStatus = await claimInternalOffer(page, url);
     db.data[user][title] ||= { title, time: datetime(), url, store: 'internal' };
     db.data[user][title].url = url;
     db.data[user][title].store = 'internal';
     if (claimStatus == 'claimed') {
-      db.data[user][title].time = datetime();
       db.data[user][title].status = 'claimed';
-      notify_games.push({ title, status: 'claimed', url });
+      if (alreadyReported) {
+        console.log('  Claim confirmed, but it was already reported. Skipping duplicate notification.');
+      } else {
+        db.data[user][title].time = datetime();
+        notify_games.push({ title, status: 'claimed', url });
+      }
     } else if (claimStatus == 'existed') {
       console.log('  Already collected! Nothing to claim.');
       if (db.data[user][title].status?.startsWith('failed:')) db.data[user][title].status = 'claimed';
