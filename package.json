@@ -14,7 +14,7 @@
     "docker:build": "docker build . -t ghcr.io/daddyparodz/free-games-claimer",
     "docker": "cross-env-shell docker run --rm -it -p 5900:5900 -p 6080:6080 -v \\\"$INIT_CWD/data\\\":/fgc/data --name fgc ghcr.io/daddyparodz/free-games-claimer",
     "lint": "npx eslint .",
-    "test": "node --test test/page-state.test.js"
+    "test": "node --test test/*.test.js"
   },
   "type": "module",
   "engines": {
@@ -28,6 +28,7 @@
     "fingerprint-injector": "^2.1.66",
     "lowdb": "^7.0.1",
     "otplib": "^12.0.1",
+    "patchright": "^1.63.0",
     "playwright-firefox": "^1.52.0",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
   },

@@ -1,9 +1,9 @@
-import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdated playwright-extra
+import { chromium } from 'patchright';
 import { authenticator } from 'otplib';
 import chalk from 'chalk';
 import path from 'path';
-import { existsSync, writeFileSync, appendFileSync } from 'fs';
-import { resolve, jsonDb, datetime, stealth, filenamify, prompt, notify, html_game_list, handleSIGINT } from './src/util.js';
+import { existsSync, writeFileSync } from 'fs';
+import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, handleSIGINT } from './src/util.js';
 import { cfg } from './src/config.js';
 import { waitForEpicClaimSuccess } from './src/page-state.js';
 
@@ -20,9 +20,15 @@ const waitForEpicNavigation = async page => {
   } catch {
     const body = await page.locator('body').innerText({ timeout: 3000 }).catch(_ => '');
     const compactBody = body.replace(/\s+/g, ' ').trim();
-    const cloudflare = (/Enable JavaScript and cookies to continue|checking if the site connection is secure|cloudflare|challenge/i).test(`${page.url()} ${compactBody}`);
+    const cloudflare = (/Enable JavaScript and cookies to continue|checking if the site connection is secure|one more step|security check to continue|session id|cloudflare|challenge/i).test(`${page.url()} ${compactBody}`);
     if (cloudflare) {
-      throw new Error(`Epic Store is showing Cloudflare instead of the store UI: "Enable JavaScript and cookies to continue". Open the browser once with SHOW=1, complete the check, then retry. URL: ${page.url()}`);
+      if (!cfg.headless) {
+        console.error(`Epic security check detected. Waiting up to ${cfg.login_timeout / 1000} seconds for it to be completed in the browser.`);
+        await notify('epic-games: security check detected. Complete it in the visible browser.').catch(_ => { });
+        const navigation = page.locator('egs-navigation');
+        if (await navigation.waitFor({ state: 'attached', timeout: cfg.login_timeout }).then(() => true).catch(_ => false)) return;
+      }
+      throw new Error(`Epic Store security check did not clear. Open the browser with SHOW=1, complete the check, then retry. URL: ${page.url()}`);
     }
     throw new Error(`Epic Store navigation did not load. URL: ${page.url()}. Page text: ${compactBody.slice(0, 500)}`);
   }
@@ -112,35 +118,24 @@ const db = await jsonDb('epic-games.json', {});
 
 if (cfg.time) console.time('startup');
 
-const browserPrefs = path.join(cfg.dir.browser, 'prefs.js');
-if (existsSync(browserPrefs)) {
-  console.log('Adding webgl.disabled to', browserPrefs);
-  appendFileSync(browserPrefs, 'user_pref("webgl.disabled", true);'); // apparently Firefox removes duplicates (and sorts), so no problem appending every time
-} else {
-  console.log(browserPrefs, 'does not exist yet, will patch it on next run. Restart the script if you get a captcha.');
-}
-
 // https://playwright.dev/docs/auth#multi-factor-authentication
-const context = await firefox.launchPersistentContext(cfg.dir.browser, {
-  headless: cfg.headless,
+const context = await chromium.launchPersistentContext(cfg.dir.browser, {
+  // Epic fingerprints regular Playwright and headless browsers. Patchright's
+  // headed Chromium is the upstream project's current mitigation.
+  headless: false,
   viewport: { width: cfg.width, height: cfg.height },
-  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0', // see replace of Headless in util.newStealthContext. TODO Windows UA enough to avoid 'device not supported'? update if browser is updated?
-  // userAgent firefox (macOS): Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:106.0) Gecko/20100101 Firefox/106.0
-  // userAgent firefox (docker): Mozilla/5.0 (X11; Linux aarch64; rv:109.0) Gecko/20100101 Firefox/115.0
   locale: 'en-US', // ignore OS locale to be sure to have english text for locators
   recordVideo: cfg.record ? { dir: 'data/record/', size: { width: cfg.width, height: cfg.height } } : undefined, // will record a .webm video for each page navigated; without size, video would be scaled down to fit 800x800
   recordHar: cfg.record ? { path: `data/record/eg-${filenamify(datetime())}.har` } : undefined, // will record a HAR file with network requests and responses; can be imported in Chrome devtools
   handleSIGINT: false, // have to handle ourselves and call context.close(), otherwise recordings from above won't be saved
-  // user settings for firefox have to be put in $BROWSER_DIR/user.js
-  args: [ // https://wiki.mozilla.org/Firefox/CommandLineOptions
-    // '-kiosk',
+  args: [
+    '--hide-crash-restore-bubble',
+    '--ignore-gpu-blocklist',
+    '--enable-unsafe-webgpu',
   ],
 });
 
 handleSIGINT(context);
-
-// Without stealth plugin, the website shows an hcaptcha on login with username/password and in the last step of claiming a game. It may have other heuristics like unsuccessful logins as well. After <6h (TBD) it resets to no captcha again. Getting a new IP also resets.
-await stealth(context);
 
 if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
 
@@ -171,6 +166,14 @@ try {
   if (cfg.time) console.timeEnd('startup');
   if (cfg.time) console.time('login');
 
+    if (cfg.eg_browser_login) {
+      console.info('Complete the one-time Epic sign-in in the visible Chromium window.');
+      await notify('epic-games: one-time Chromium sign-in is required in the visible browser.').catch(_ => { });
+      await page.waitForURL('**/free-games**', { timeout: cfg.login_timeout });
+      if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
+      loginState = await getLoginState(page);
+      continue;
+    }
   // page.click('button:has-text("Accept All Cookies")').catch(_ => { }); // Not needed anymore since we set the cookie above. Clicking this did not always work since the message was animated in too slowly.
   await clickIfVisible(page.locator('button:has-text("Continue")')); // accept updated Epic privacy policy if shown
 
