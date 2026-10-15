@@ -6,13 +6,13 @@ import { existsSync, writeFileSync } from 'fs';
 import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, handleSIGINT } from './src/util.js';
 import { cfg } from './src/config.js';
 import { waitForEpicClaimSuccess } from './src/page-state.js';
+import { waitForPurchaseButton, waitForEpicCheckout } from './src/epic-purchase.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
 
 const STORE_HOST = 'https://store.epicgames.com';
 const URL_CLAIM = `${STORE_HOST}/free-games?lang=en-US`;
 const URL_LOGIN = 'https://www.epicgames.com/id/login?lang=en-US&noHostRedirect=true&redirectUrl=' + encodeURIComponent(URL_CLAIM);
-const PURCHASE_CTA_SELECTOR = 'button[data-testid="purchase-cta-button"]';
 
 const waitForEpicNavigation = async page => {
   try {
@@ -102,16 +102,6 @@ const getCurrentFreeGameUrls = async page => {
   return getCurrentFreeGameUrlsFromPage(page);
 };
 
-const waitForPurchaseButton = async page => {
-  await page.waitForFunction(selector => {
-    // eslint-disable-next-line no-undef
-    const btn = document.querySelector(selector);
-    const text = btn?.textContent?.trim().toLowerCase();
-    return text && text != 'loading';
-  }, PURCHASE_CTA_SELECTOR);
-  return page.locator(PURCHASE_CTA_SELECTOR).first();
-};
-
 console.log(datetime(), 'started checking epic-games');
 
 const db = await jsonDb('epic-games.json', {});
@@ -166,14 +156,6 @@ try {
   if (cfg.time) console.timeEnd('startup');
   if (cfg.time) console.time('login');
 
-    if (cfg.eg_browser_login) {
-      console.info('Complete the one-time Epic sign-in in the visible Chromium window.');
-      await notify('epic-games: one-time Chromium sign-in is required in the visible browser.').catch(_ => { });
-      await page.waitForURL('**/free-games**', { timeout: cfg.login_timeout });
-      if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
-      loginState = await getLoginState(page);
-      continue;
-    }
   // page.click('button:has-text("Accept All Cookies")').catch(_ => { }); // Not needed anymore since we set the cookie above. Clicking this did not always work since the message was animated in too slowly.
   await clickIfVisible(page.locator('button:has-text("Continue")')); // accept updated Epic privacy policy if shown
 
@@ -184,6 +166,14 @@ try {
     if (!cfg.debug) context.setDefaultTimeout(cfg.login_timeout); // give user some extra time to log in
     console.info(`Login timeout is ${cfg.login_timeout / 1000} seconds!`);
     await page.goto(URL_LOGIN, { waitUntil: 'domcontentloaded' });
+    if (cfg.eg_browser_login) {
+      console.info('Complete the one-time Epic sign-in in the visible Chromium window.');
+      await notify('epic-games: one-time Chromium sign-in is required in the visible browser.').catch(_ => { });
+      await page.waitForURL('**/free-games**', { timeout: cfg.login_timeout });
+      if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
+      loginState = await getLoginState(page);
+      continue;
+    }
     if (cfg.eg_email && cfg.eg_password) console.info('Using email and password from environment.');
     else console.info('Press ESC to skip the prompts if you want to login in the browser (not possible in headless mode).');
     const notifyBrowserLogin = async () => {
@@ -268,7 +258,7 @@ try {
     let title;
     let bundle_includes;
     if (await page.locator('span:text-is("About Bundle")').count()) {
-      title = (await page.locator('span:has-text("Buy"):left-of([data-testid="purchase-cta-button"])').first().innerText()).replace('Buy ', '');
+      title = await page.locator('h1').first().innerText();
       // h1 first didn't exist for bundles but now it does... However h1 would e.g. be 'Fallout® Classic Collection' instead of 'Fallout Classic Collection'
       try {
         bundle_includes = await Promise.all((await page.locator('.product-card-top-row h5').all()).map(b => b.innerText()));
@@ -323,8 +313,7 @@ try {
       }).catch(_ => { });
 
       // it then creates an iframe for the purchase
-      await page.waitForSelector('#webPurchaseContainer iframe'); // TODO needed?
-      const iframe = page.frameLocator('#webPurchaseContainer iframe');
+      const iframe = await waitForEpicCheckout(page, cfg.timeout);
       // skip game if unavailable in region, https://github.com/vogler/free-games-claimer/issues/46 TODO check games for account's region
       if (await iframe.locator(':has-text("unavailable in your region")').count() > 0) {
         console.error('  This product is unavailable in your region!');

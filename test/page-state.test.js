@@ -18,6 +18,7 @@ after(async () => {
 for (const [name, html, expected] of [
   ['classic confirmation', '<p>Thanks for your order!</p>', 'order-confirmation'],
   ['library button', '<button data-testid="purchase-cta-button">In Library</button>', 'in-library'],
+  ['semantic library button', '<button><span>In Library</span></button>', 'in-library'],
   ['launcher prompt', '<div>Is Epic Games Launcher installed?</div>', 'launcher-prompt'],
 ]) {
   test(`recognizes Epic ${name} as success`, async () => {

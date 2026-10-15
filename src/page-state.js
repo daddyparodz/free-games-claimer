@@ -1,7 +1,7 @@
 const epicSuccessStates = page => [
   { name: 'order-confirmation', locator: page.getByText(/It's all yours/i) },
   { name: 'order-confirmation', locator: page.getByText(/Thanks for your order!/i) },
-  { name: 'in-library', locator: page.locator('button[data-testid="purchase-cta-button"]:has-text("In Library")') },
+  { name: 'in-library', locator: page.getByRole('button', { name: /^In Library$/i }) },
   { name: 'launcher-prompt', locator: page.getByText(/Is Epic Games Launcher installed\?/i) },
 ];
 
