@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { firefox } from 'playwright-firefox';
-import { getGogSession, waitForEpicClaimSuccess, waitForGogSession } from '../src/page-state.js';
+import { getGogSession, isPrimeInternalClaimSuccess, waitForEpicClaimSuccess, waitForGogSession, waitForPrimeInternalClaimSuccess } from '../src/page-state.js';
 
 let browser;
 let page;
@@ -29,6 +29,18 @@ for (const [name, html, expected] of [
 test('Epic timeout reports a descriptive error instead of AggregateError', async () => {
   await page.setContent('<p>Checkout is still loading</p>');
   await assert.rejects(waitForEpicClaimSuccess(page, 25), /Epic did not show a successful claim state within/);
+});
+
+test('recognizes a hydrated Prime internal claim confirmation', async () => {
+  await page.setContent('<p>Success, Havendock will be available to play from your Amazon Games library.</p>');
+  assert.equal(await isPrimeInternalClaimSuccess(page), true);
+  assert.equal(await waitForPrimeInternalClaimSuccess(page, 25), true);
+});
+
+test('waits for Prime internal claim confirmation to hydrate', async () => {
+  await page.setContent('<main>Loading</main>');
+  setTimeout(() => page.setContent('<p>Sent to your Amazon Games library</p>'), 25);
+  assert.equal(await waitForPrimeInternalClaimSuccess(page, 500), true);
 });
 
 const response = (data, status = 200) => ({

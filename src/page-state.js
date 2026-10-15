@@ -20,6 +20,17 @@ export const waitForEpicClaimSuccess = async (page, timeout) => {
   throw new Error('Epic claim success state disappeared before it could be verified');
 };
 
+const primeInternalSuccess = page => page.getByText(
+  /will be available to play from your .* library|you collected this on|sent to your .* library|collected on/i,
+).first();
+
+export const isPrimeInternalClaimSuccess = async page => await primeInternalSuccess(page).isVisible().catch(_ => false);
+
+export const waitForPrimeInternalClaimSuccess = async (page, timeout = 15_000) => {
+  if (await isPrimeInternalClaimSuccess(page)) return true;
+  return await primeInternalSuccess(page).waitFor({ state: 'visible', timeout }).then(() => true).catch(_ => false);
+};
+
 export const getGogSession = async (context, timeout = 15_000) => {
   let response;
   try {

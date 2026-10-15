@@ -3,6 +3,7 @@ import { authenticator } from 'otplib';
 import chalk from 'chalk';
 import { resolve, jsonDb, datetime, stealth, filenamify, prompt, confirm, notify, html_game_list, handleSIGINT } from './src/util.js';
 import { cfg } from './src/config.js';
+import { isPrimeInternalClaimSuccess, waitForPrimeInternalClaimSuccess } from './src/page-state.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'prime-gaming', ...a);
 
@@ -95,13 +96,6 @@ const isExternalClaimSuccess = async page => await page.locator([
   'text=/successfully claimed/i',
 ].join(', ')).first().isVisible().catch(_ => false);
 
-const isInternalClaimSuccess = async page => await page.locator([
-  'text=/will be available to play from your .* library/i',
-  'text=/you collected this on/i',
-  'text=/sent to your .* library/i',
-  'text=/collected on/i',
-].join(', ')).first().isVisible().catch(_ => false);
-
 // Older versions stored internal claims without a status. Treat those records as
 // already reported too, otherwise a stale Prime card can generate the same
 // "claimed" notification on every scheduled run.
@@ -111,7 +105,7 @@ const wasInternalClaimAlreadyReported = game => game?.store == 'internal'
 const claimInternalOffer = async (page, url) => {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await throwIfPrimeErrorPage(page);
-  if (await isInternalClaimSuccess(page)) return 'existed';
+  if (await isPrimeInternalClaimSuccess(page)) return 'existed';
   const action = page.locator([
     'button[data-a-target="buy-box_call-to-action"]:has-text("Get game")',
     'button[data-a-target="buy-box_call-to-action"]:has-text("Claim game")',
@@ -127,8 +121,7 @@ const claimInternalOffer = async (page, url) => {
     page.waitForURL(/\/details(\?|$)/).catch(_ => { }),
     page.waitForTimeout(5000),
   ]);
-  await page.waitForTimeout(1000);
-  return await isInternalClaimSuccess(page) ? 'claimed' : 'failed';
+  return await waitForPrimeInternalClaimSuccess(page) ? 'claimed' : 'failed';
 };
 
 const isAccountLinkingRequired = async page => {
