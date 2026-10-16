@@ -6,6 +6,48 @@ export const epicPurchaseButton = page => page.getByRole('button', {
 
 export const epicCheckoutAuthError = () => 'Epic checkout redirected to Epic login and did not return before timeout. No order was placed for this game. The store listing signed-in status does not authenticate checkout. Complete the Epic sign-in shown in the visible browser, then retry.';
 
+// The legacy listing uses EPIC_EG1; the current product app uses EPIC_AUTH_*.
+// A signed-in listing (or wallet response) is not evidence for this boundary.
+export const ensureEpicProductAccount = async (page, { displayName, loginTimeout = 180000 } = {}) => {
+  const productUrl = new URL(page.url());
+  if (productUrl.origin !== 'https://store.epicgames.com' || !productUrl.pathname.includes('/p/')) {
+    throw new Error('Epic product authentication must be checked on a product page.');
+  }
+  const readAccount = () => page.evaluate(async () => {
+    const response = await fetch('/proxy/api/account', { credentials: 'include', cache: 'no-store' });
+    if (response.status === 401) return null;
+    if (!response.ok) throw new Error(`Epic product account request failed: HTTP ${response.status}`);
+    const account = await response.json();
+    if (typeof account.id !== 'string' || !account.id || typeof account.displayName !== 'string' || !account.displayName) {
+      throw new Error('Epic product account response did not contain an authenticated identity.');
+    }
+    return { id: account.id, displayName: account.displayName };
+  });
+  let account = await readAccount();
+  if (!account) {
+    // Let Epic resume its own SSO session, or keep its MFA/login visible. Never
+    // copy legacy tokens into the product cookie or automate an identity provider.
+    const href = await page.locator('egs-navigation').first().getAttribute('signinlinkhref');
+    const login = href && new URL(href, productUrl);
+    if (!login || login.origin !== productUrl.origin || login.pathname !== '/login') {
+      throw new Error('Epic product sign-in link is missing or unexpected; no order was placed.');
+    }
+    try {
+      // Use the product app's own client/state, not the legacy listing login URL.
+      await page.goto(login.href, { waitUntil: 'domcontentloaded' });
+      await page.waitForURL(url => url.origin === productUrl.origin && url.pathname === productUrl.pathname, { timeout: loginTimeout });
+    } catch {
+      throw new Error('Epic product session requires completion of the sign-in or MFA shown in the browser. The listing session is separate; no order was placed.');
+    }
+    account = await readAccount();
+    if (!account) throw new Error('Epic returned to the product without an authenticated product account; no order was placed.');
+  }
+  if (displayName && account.displayName !== displayName) {
+    throw new Error('Epic product account differs from the listing account; refusing to claim or update ownership.');
+  }
+  return account;
+};
+
 export const isEpicLoginRedirect = page => {
   return page.frames().some(frame => {
     try { const url = new URL(frame.url()); return url.hostname === 'www.epicgames.com' && url.pathname.startsWith('/id/login'); } catch { return false; }

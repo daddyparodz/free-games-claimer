@@ -7,7 +7,7 @@ import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, 
 import { cfg } from './src/config.js';
 
 import { epicErrorKeepOpenSeconds, retainEpicFailure } from './src/epic-error-retention.js';
-import { waitForPurchaseButton, waitForEpicCheckout, submitEpicFreeOrder, epicCheckoutAuthError } from './src/epic-purchase.js';
+import { waitForPurchaseButton, waitForEpicCheckout, submitEpicFreeOrder, ensureEpicProductAccount } from './src/epic-purchase.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
 
@@ -238,6 +238,7 @@ try {
   for (const url of urls) {
     if (cfg.time) console.time('claim game');
     await page.goto(url); // , { waitUntil: 'domcontentloaded' });
+    await ensureEpicProductAccount(page, { displayName: user, loginTimeout: cfg.login_timeout });
     const purchaseBtn = await waitForPurchaseButton(page);
     const btnText = (await purchaseBtn.innerText()).toLowerCase(); // barrier to block until page is loaded
 
