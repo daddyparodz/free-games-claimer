@@ -7,7 +7,7 @@ import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, 
 import { cfg } from './src/config.js';
 
 import { epicErrorKeepOpenSeconds, retainEpicFailure } from './src/epic-error-retention.js';
-import { waitForPurchaseButton, waitForEpicCheckout, submitEpicFreeOrder } from './src/epic-purchase.js';
+import { waitForPurchaseButton, waitForEpicCheckout, submitEpicFreeOrder, epicCheckoutAuthError } from './src/epic-purchase.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
 
@@ -392,7 +392,7 @@ try {
   process.exitCode ||= 1;
   console.error('--- Exception:');
   console.error(error); // .toString()?
-  if (error.message && process.exitCode != 130) notify(`epic-games failed: ${error.message.split('\n')[0]}`);
+  if (error.message && process.exitCode != 130) await notify(error.message.split('\n')[0]);
 } finally {
   try {
     await db.write(); // write out json db
