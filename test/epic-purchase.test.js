@@ -40,7 +40,7 @@ test('waits for user-completed CAPTCHA without interacting with the challenge', 
 
 test('claim records require fresh independent library readback', async () => {
  const source=await readFile(new URL('../epic-games.js',import.meta.url),'utf8');
- assert.ok(source.replace(/\r\n/g,'\n').includes("await page.goto(url);\n        await page.getByRole('button', { name: /^In Library$/i }).waitFor"));
+ assert.ok(source.replace(/\r\n/g,'\n').replace(/\n[ \t]*/g, '\n').includes("await page.goto(url);\nawait page.getByRole('button', { name: /^In Library$/i }).waitFor"));
 });
 
 test('allows a transient Epic SSO redirect to settle into checkout', async () => {
