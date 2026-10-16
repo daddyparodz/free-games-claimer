@@ -392,7 +392,7 @@ try {
   process.exitCode ||= 1;
   console.error('--- Exception:');
   console.error(error); // .toString()?
-  if (error.message && process.exitCode != 130) await notify(error.message.split('\n')[0]);
+  if (error.message && process.exitCode != 130) await notify(`epic-games failed: ${error.message.split('\n')[0]}`);
 } finally {
   try {
     await db.write(); // write out json db
