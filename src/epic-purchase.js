@@ -7,22 +7,51 @@ export const epicPurchaseButton = page => page.getByRole('button', {
 export const epicCheckoutAuthError = () => 'Epic checkout redirected to Epic login after the store page reported you signed in. No game was claimed. The saved Epic session did not authenticate checkout; leave the visible browser open and retry after the session settles.';
 
 export const isEpicLoginRedirect = page => {
-  try { const url = new URL(page.url()); return url.hostname === 'www.epicgames.com' && url.pathname.startsWith('/id/login'); } catch { return false; }
+  return page.frames().some(frame => {
+    try { const url = new URL(frame.url()); return url.hostname === 'www.epicgames.com' && url.pathname.startsWith('/id/login'); } catch { return false; }
+  });
+};
+
+export const resumeEpicCheckoutLogin = async (page, returnUrl, timeout = 180000) => {
+  const candidates = [page, ...page.frames()];
+  let google;
+  for (const scope of candidates) {
+    const button = scope.getByRole('button', { name: /google/i }).first();
+    if (await button.isVisible().catch(() => false)) { google = button; break; }
+  }
+  if (!google) return 'none';
+  const target = new URL(returnUrl);
+  const before = page.url();
+  await google.click();
+  if (page.url() === before) return 'google';
+  try {
+    await page.waitForURL(url => url.origin === target.origin && (url.pathname === target.pathname || url.pathname.startsWith('/id/')), { timeout });
+    return page.url() !== before ? 'google' : 'none';
+  } catch {
+    return 'none';
+  }
 };
 
 export const waitForEpicCheckout = async (page, timeout = 60000) => {
+  const returnUrl = page.url();
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     await waitForEpicManualChallenge(page);
     // Account redirects can be intermediate SSO hops. Let the bounded checkout
     // wait settle before classifying them as an authentication blocker.
+    if (isEpicLoginRedirect(page)) {
+      const resumed = await resumeEpicCheckoutLogin(page, returnUrl, Math.min(180000, Math.max(1000, deadline - Date.now())));
+      if (resumed === 'google') {
+        await page.waitForTimeout(1000);
+        return await waitForEpicCheckout(page, Math.max(1000, deadline - Date.now()));
+      }
+    }
     const checkoutSelector = '#webPurchaseContainer iframe, iframe[title="Checkout"][src^="https://store.epicgames.com/checkout"], iframe[title="Checkout"][src^="/checkout"]';
     if (await page.locator(checkoutSelector).first().isVisible()) {
       return page.frameLocator(checkoutSelector).first();
     }
     await page.waitForTimeout(100);
   }
-  const url = new URL(page.url());
   if (isEpicLoginRedirect(page)) {
     throw new Error(epicCheckoutAuthError());
   }
