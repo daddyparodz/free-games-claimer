@@ -28,6 +28,7 @@ export const cfg = {
       screenshots: process.env.SCREENSHOTS_DIR || dataDir('screenshots'), // set to 0 to disable screenshots
     };
   },
+  get epic_browser_dir() { return process.env.BROWSER_DIR || dataDir('browser-epic-chromium'); },
   // auth epic-games
   eg_email: process.env.EG_EMAIL || process.env.EMAIL,
   eg_password: process.env.EG_PASSWORD || process.env.PASSWORD,

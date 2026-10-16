@@ -5,8 +5,9 @@ import path from 'path';
 import { existsSync, writeFileSync } from 'fs';
 import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, handleSIGINT } from './src/util.js';
 import { cfg } from './src/config.js';
-import { waitForEpicClaimSuccess } from './src/page-state.js';
-import { waitForPurchaseButton, waitForEpicCheckout } from './src/epic-purchase.js';
+
+import { epicErrorKeepOpenSeconds, retainEpicFailure } from './src/epic-error-retention.js';
+import { waitForPurchaseButton, waitForEpicCheckout, submitEpicFreeOrder } from './src/epic-purchase.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
 
@@ -109,7 +110,7 @@ const db = await jsonDb('epic-games.json', {});
 if (cfg.time) console.time('startup');
 
 // https://playwright.dev/docs/auth#multi-factor-authentication
-const context = await chromium.launchPersistentContext(cfg.dir.browser, {
+const context = await chromium.launchPersistentContext(cfg.epic_browser_dir, {
   // Epic fingerprints regular Playwright and headless browsers. Patchright's
   // headed Chromium is the upstream project's current mitigation.
   headless: false,
@@ -144,6 +145,7 @@ if (cfg.debug_network) {
 
 const notify_games = [];
 let user;
+let epicFailure = false;
 
 try {
   await context.addCookies([
@@ -339,12 +341,8 @@ try {
         continue;
       }
 
-      // Playwright clicked before button was ready to handle event, https://github.com/vogler/free-games-claimer/issues/84#issuecomment-1474346591
-      await iframe.locator('button:has-text("Add to library"):not(:has(.payment-loading--loading)), button:has-text("Place Order"):not(:has(.payment-loading--loading))').first().click({ delay: 11 });
-
-      // I Agree button is only shown for EU accounts! https://github.com/vogler/free-games-claimer/pull/7#issuecomment-1038964872
-      const btnAgree = iframe.locator('button:has-text("I Accept")');
-      btnAgree.waitFor().then(() => btnAgree.click()).catch(_ => { }); // EU: wait for and click 'I Agree'
+      // One awaited order flow handles the current checkout and EU confirmation.
+      // It resumes after human CAPTCHA completion without clicking the challenge.
       try {
         // context.setDefaultTimeout(100 * 1000); // give time to solve captcha, iframe goes blank after 60s?
         const captcha = iframe.locator('#h_captcha_challenge_checkout_free_prod iframe');
@@ -364,12 +362,16 @@ try {
           console.error('  Failed to challenge captcha, please try again later.');
           await notify('epic-games: failed to challenge captcha. Please check.');
         }).catch(_ => { });
-        const successState = await waitForEpicClaimSuccess(page, cfg.timeout);
+        const successState = await submitEpicFreeOrder(page, iframe, { timeout: cfg.timeout, manualTimeout: 600000 });
+        await page.goto(url);
+        await page.getByRole('button', { name: /^In Library$/i }).waitFor({ state: 'visible', timeout: cfg.timeout });
         db.data[user][game_id].status = 'claimed';
         db.data[user][game_id].time = datetime(); // claimed time overwrites failed/dryrun time
         console.log(`  Claimed successfully! (${successState})`);
         // context.setDefaultTimeout(cfg.timeout);
       } catch (e) {
+        epicFailure = true;
+        process.exitCode ||= 1;
         console.log(e);
         // console.error('  Failed to claim! Try again if NopeCHA timed out. Click the extension to see if you ran out of credits (refill after 24h). To avoid captchas try to get a new IP or set a cookie from https://www.hcaptcha.com/accessibility');
         console.error('  Failed to claim! To avoid captchas try to get a new IP address.');
@@ -386,16 +388,44 @@ try {
   }
   if (cfg.time) console.timeEnd('claim all games');
 } catch (error) {
+  epicFailure = true;
   process.exitCode ||= 1;
   console.error('--- Exception:');
   console.error(error); // .toString()?
   if (error.message && process.exitCode != 130) notify(`epic-games failed: ${error.message.split('\n')[0]}`);
 } finally {
-  await db.write(); // write out json db
-  if (notify_games.filter(g => g.status == 'claimed' || g.status == 'failed').length) { // don't notify if all have status 'existed', 'manual', 'requires base game', 'unavailable-in-region', 'skipped'
-    notify(`epic-games (${user}):<br>${html_game_list(notify_games)}`);
+  try {
+    await db.write(); // write out json db
+    if (notify_games.filter(g => g.status == 'claimed' || g.status == 'failed').length) {
+      await notify(`epic-games (${user}):<br>${html_game_list(notify_games)}`);
+    }
+  } catch (error) {
+    epicFailure = true;
+    process.exitCode ||= 1;
+    console.error('Epic result persistence/notification failed:', error.message);
   }
 }
 if (cfg.debug) writeFileSync(path.resolve(cfg.dir.browser, 'cookies.json'), JSON.stringify(await context.cookies()));
 if (page.video()) console.log('Recorded video:', await page.video().path());
-await context.close();
+if (epicFailure && process.exitCode != 130) {
+  const seconds = epicErrorKeepOpenSeconds(process.env.EG_ERROR_KEEP_OPEN_SECONDS);
+  console.error(`Epic failed: capturing evidence; browser stays open for ${seconds} seconds (EG_ERROR_KEEP_OPEN_SECONDS, max 1800). Action timeout unchanged; no automatic order retry.`);
+  await retainEpicFailure({
+    seconds,
+    capture: async () => {
+      const stamp = filenamify(datetime());
+      await page.screenshot({ path: screenshot('failed', `error-${stamp}.png`), timeout: 10000 }).catch(() => {});
+      const safeUrl = value => { try { const url = new URL(value); return url.origin + url.pathname; } catch { return 'unknown'; } };
+      const evidence = [];
+      for (const frame of page.frames()) {
+        evidence.push({ url: safeUrl(frame.url()), buttons: await frame.locator('button').evaluateAll(elements => elements.map(element => ({ text: element.textContent.trim().replace(/\s+/g, ' ').slice(0, 100), disabled: element.disabled, visible: !!element.getClientRects().length }))).catch(() => []) });
+      }
+      writeFileSync(screenshot('failed', `error-${stamp}.json`), JSON.stringify(evidence, null, 2));
+    },
+    wait: ms => new Promise(resolve => {
+      const timer = setTimeout(resolve, ms);
+      context.once('close', () => { clearTimeout(timer); resolve(); });
+    }),
+    close: () => context.close(),
+  });
+} else await context.close();
