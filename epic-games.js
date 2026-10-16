@@ -7,7 +7,7 @@ import { resolve, jsonDb, datetime, filenamify, prompt, notify, html_game_list, 
 import { cfg } from './src/config.js';
 
 import { epicErrorKeepOpenSeconds, retainEpicFailure } from './src/epic-error-retention.js';
-import { waitForPurchaseButton, waitForEpicCheckout, submitEpicFreeOrder, epicCheckoutAuthError, resumeEpicCheckoutLogin } from './src/epic-purchase.js';
+import { waitForPurchaseButton, waitForEpicCheckout, submitEpicFreeOrder, epicCheckoutAuthError } from './src/epic-purchase.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'epic-games', ...a);
 
