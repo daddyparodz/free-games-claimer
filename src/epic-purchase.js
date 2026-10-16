@@ -4,7 +4,7 @@ export const epicPurchaseButton = page => page.getByRole('button', {
   name: /^(Get|In Library|Requires Base Game|Buy Now|Pre-Purchase|Coming Soon|Unavailable|Not Available|Loading(?:\.{3}|…)?)$/i,
 }).filter({ visible: true }).first();
 
-export const epicCheckoutAuthError = () => 'Epic checkout redirected to Epic login after the store page reported you signed in. No game was claimed. The saved Epic session did not authenticate checkout; leave the visible browser open and retry after the session settles.';
+export const epicCheckoutAuthError = () => 'Epic checkout redirected to Epic login and did not return before timeout. No order was placed for this game. The store listing signed-in status does not authenticate checkout. Complete the Epic sign-in shown in the visible browser, then retry.';
 
 export const isEpicLoginRedirect = page => {
   return page.frames().some(frame => {
@@ -19,7 +19,8 @@ export const waitForEpicCheckout = async (page, timeout = 60000) => {
     // Account redirects can be intermediate SSO hops. Let the bounded checkout
     // wait settle before classifying them as an authentication blocker.
     if (isEpicLoginRedirect(page)) {
-      throw new Error(epicCheckoutAuthError());
+      await page.waitForTimeout(Math.min(100, Math.max(1, deadline - Date.now())));
+      continue;
     }
     const checkoutSelector = '#webPurchaseContainer iframe, iframe[title="Checkout"][src^="https://store.epicgames.com/checkout"], iframe[title="Checkout"][src^="/checkout"]';
     if (await page.locator(checkoutSelector).first().isVisible()) {
