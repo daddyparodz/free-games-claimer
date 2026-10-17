@@ -4,7 +4,7 @@ export const epicPurchaseButton = page => page.getByRole('button', {
   name: /^(Get|In Library|Requires Base Game|Buy Now|Pre-Purchase|Coming Soon|Unavailable|Not Available|Loading(?:\.{3}|…)?)$/i,
 }).filter({ visible: true }).first();
 
-export const epicCheckoutAuthError = () => 'Epic checkout redirected to Epic login and did not return before timeout. No order was placed for this game. The store listing signed-in status does not authenticate checkout. Complete the Epic sign-in shown in the visible browser, then retry.';
+export const epicCheckoutAuthError = () => 'Complete Epic sign-in in the browser.';
 
 // The legacy listing uses EPIC_EG1; the current product app uses EPIC_AUTH_*.
 // A signed-in listing (or wallet response) is not evidence for this boundary.
@@ -30,17 +30,17 @@ export const ensureEpicProductAccount = async (page, { displayName, loginTimeout
     const href = await page.locator('egs-navigation').first().getAttribute('signinlinkhref');
     const login = href && new URL(href, productUrl);
     if (!login || login.origin !== productUrl.origin || login.pathname !== '/login') {
-      throw new Error('Epic product sign-in link is missing or unexpected; no order was placed.');
+      throw new Error('Epic sign-in link is missing or invalid.');
     }
     try {
       // Use the product app's own client/state, not the legacy listing login URL.
       await page.goto(login.href, { waitUntil: 'domcontentloaded' });
       await page.waitForURL(url => url.origin === productUrl.origin && url.pathname === productUrl.pathname, { timeout: loginTimeout });
     } catch {
-      throw new Error('Epic product session requires completion of the sign-in or MFA shown in the browser. The listing session is separate; no order was placed.');
+      throw new Error(epicCheckoutAuthError());
     }
     account = await readAccount();
-    if (!account) throw new Error('Epic returned to the product without an authenticated product account; no order was placed.');
+    if (!account) throw new Error('Epic sign-in did not complete.');
   }
   if (displayName && account.displayName !== displayName) {
     throw new Error('Epic product account differs from the listing account; refusing to claim or update ownership.');
@@ -73,7 +73,7 @@ export const waitForEpicCheckout = async (page, timeout = 60000) => {
   if (isEpicLoginRedirect(page)) {
     throw new Error(epicCheckoutAuthError());
   }
-  throw new Error('Epic checkout did not appear before timeout; no order was placed.');
+  throw new Error('Epic checkout did not load.');
 };
 
 export const waitForEpicManualChallenge = async (page, timeout = 600000, onChallenge = () => {}) => {
@@ -83,7 +83,7 @@ export const waitForEpicManualChallenge = async (page, timeout = 600000, onChall
   try {
     await challenge.waitFor({ state: 'hidden', timeout });
   } catch (cause) {
-    throw new Error('Epic CAPTCHA still requires manual completion; no challenge interaction was automated.', { cause });
+    throw new Error('Complete the Epic CAPTCHA in the browser.', { cause });
   }
 };
 
@@ -120,7 +120,7 @@ export const submitEpicFreeOrder = async (page, checkout, { timeout = 60000, man
     }
     await page.waitForTimeout(100);
   }
-  throw new Error('Epic order did not reach a verified success state after submission; ownership is not confirmed.');
+  throw new Error('Epic did not confirm the order.');
 };
 
 export const waitForPurchaseButton = async page => {

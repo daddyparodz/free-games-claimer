@@ -33,7 +33,7 @@ test('checkout does not return an outer checkout iframe while its embedded auth 
     }));
     await page.setContent('<div id="webPurchaseContainer"><iframe src="https://www.epicgames.com/id/login"></iframe></div>');
     const started = Date.now();
-    await assert.rejects(waitForEpicCheckout(page, 500), /Epic checkout redirected to Epic login/);
+    await assert.rejects(waitForEpicCheckout(page, 500), /Complete Epic sign-in in the browser/);
     assert.ok(Date.now() - started >= 450, 'must allow the bounded auth settle interval');
   } finally {
     await page.close();

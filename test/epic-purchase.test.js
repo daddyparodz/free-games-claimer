@@ -55,7 +55,7 @@ test('reports checkout sign-in redirect instead of timing out on missing iframe'
   const helper = await import('../src/epic-purchase.js');
   waitForEpicCheckout = helper.waitForEpicCheckout;
   assert.equal(typeof waitForEpicCheckout, 'function');
-  await assert.rejects(waitForEpicCheckout(page, 500), /Epic checkout redirected to Epic login/);
+  await assert.rejects(waitForEpicCheckout(page, 500), /Complete Epic sign-in in the browser/);
 });
 before(async () => {
   browser = await chromium.launch({ headless: true });

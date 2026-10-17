@@ -121,6 +121,9 @@ await withBrowser(chromium, cfg.epic_browser_dir, {
   recordHar: cfg.record ? { path: `data/record/eg-${filenamify(datetime())}.har` } : undefined, // will record a HAR file with network requests and responses; can be imported in Chrome devtools
   handleSIGINT: false, // have to handle ourselves and call context.close(), otherwise recordings from above won't be saved
   args: [
+    // Keep Chromium's SSO session across scheduled runs so Epic can renew its
+    // short-lived product login. Cookies retain Epic's original expiry rules.
+    '--restore-last-session',
     '--hide-crash-restore-bubble',
     '--ignore-gpu-blocklist',
     '--enable-unsafe-webgpu',

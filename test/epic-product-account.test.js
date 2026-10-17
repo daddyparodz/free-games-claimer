@@ -58,7 +58,7 @@ test('uncompleted Epic MFA is preserved and never classified as an authenticated
     });
     await page.route('https://www.epicgames.com/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Enter security code</h1><input name="code">' }));
     await page.goto('https://store.epicgames.com/p/fixture');
-    await assert.rejects(purchase.ensureEpicProductAccount(page, { displayName: 'FixtureUser', loginTimeout: 300 }), /sign-in or MFA/);
+    await assert.rejects(purchase.ensureEpicProductAccount(page, { displayName: 'FixtureUser', loginTimeout: 300 }), { message: 'Complete Epic sign-in in the browser.' });
     assert.equal(await page.locator('h1').innerText(), 'Enter security code');
     assert.equal(await page.locator('input').inputValue(), '');
   } finally {
