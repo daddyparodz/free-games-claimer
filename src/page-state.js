@@ -31,17 +31,79 @@ export const waitForPrimeInternalClaimSuccess = async (page, timeout = 15_000) =
   return await primeInternalSuccess(page).waitFor({ state: 'visible', timeout }).then(() => true).catch(_ => false);
 };
 
-export const getGogSession = async (context, timeout = 15_000) => {
-  let response;
-  try {
-    response = await context.request.get('https://www.gog.com/userData.json', {
-      headers: { 'Cache-Control': 'no-cache' },
-      timeout,
-    });
-  } catch (cause) {
-    throw new Error('Could not read GOG login state from userData.json', { cause });
+const parseHttpDate = (value, now) => {
+  let match = (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) ([A-Z][a-z]{2}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/).exec(value);
+  let obsolete = false;
+  if (!match) {
+    match = (/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (\d{2})-([A-Z][a-z]{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) GMT$/).exec(value);
+    obsolete = !!match;
   }
-  if (!response.ok()) throw new Error(`GOG userData.json returned HTTP ${response.status()}`);
+  if (!match) {
+    const asctime = (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) ([A-Z][a-z]{2}) ( \d|\d{2}) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/).exec(value);
+    if (!asctime) return NaN;
+    match = [asctime[0], asctime[1], asctime[3], asctime[2], asctime[7], asctime[4], asctime[5], asctime[6]];
+  }
+  const [, weekday, dayText, monthText, yearText, hourText, minuteText, secondText] = match;
+  const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(monthText);
+  const [day, hour, minute, second] = [dayText, hourText, minuteText, secondText].map(Number);
+  if (month < 0 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) return NaN;
+  let year = Number(yearText);
+  const date = new Date(0);
+  if (obsolete) {
+    const limit = new Date(now);
+    limit.setUTCFullYear(limit.getUTCFullYear() + 50);
+    year += Math.floor(limit.getUTCFullYear() / 100) * 100;
+    date.setUTCFullYear(year, month, day);
+    date.setUTCHours(hour, minute, second, 0);
+    if (date.getTime() > limit.getTime()) year -= 100;
+  }
+  // UTC setters avoid local-time parsing and Date.UTC's special treatment of years 00-99.
+  date.setUTCFullYear(year, month, day);
+  date.setUTCHours(hour, minute, second, 0);
+  if (date.getUTCFullYear() != year || date.getUTCMonth() != month || date.getUTCDate() != day
+    || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getUTCDay()] != weekday.slice(0, 3)) return NaN;
+  return date.getTime();
+};
+
+export const getGogSession = async (context, timeout = 15_000) => {
+  const deadline = Date.now() + timeout;
+  let response;
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const remaining = deadline - Date.now();
+    if (attempt > 0 && remaining <= 0) throw lastError;
+    try {
+      response = await context.request.get('https://www.gog.com/userData.json', {
+        headers: { 'Cache-Control': 'no-cache' },
+        timeout: Math.max(1, remaining),
+      });
+    } catch (cause) {
+      throw new Error('Could not read GOG login state from userData.json', { cause });
+    }
+    if (response.ok()) break;
+    const status = response.status();
+    const error = new Error(`GOG userData.json returned HTTP ${status}`);
+    lastError = error;
+    // Only retry the read-only session GET, never a giveaway claim or login.
+    let delay = 1000 * 2 ** attempt;
+    if (status == 503 && attempt < 2) {
+      const retryAfter = response.headers()['retry-after'];
+      if (retryAfter && (/^\d+$/).test(retryAfter)) delay = Number(retryAfter) * 1000;
+      else if (retryAfter) {
+        const now = Date.now();
+        const retryAt = parseHttpDate(retryAfter, now);
+        if (Number.isFinite(retryAt)) delay = Math.max(0, retryAt - now);
+      }
+    }
+    try {
+      await response.dispose?.();
+    } catch {
+      // Cleanup must not replace the HTTP error or prevent an eligible retry.
+    }
+    if (status != 503 || attempt == 2 || delay >= deadline - Date.now()) throw error;
+    console.warn(`GOG userData.json returned HTTP 503; retrying session read (${attempt + 2}/3) in ${delay} ms`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
 
   let data;
   try {
