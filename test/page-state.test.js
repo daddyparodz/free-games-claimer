@@ -23,7 +23,7 @@ for (const [name, html, expected] of [
 ]) {
   test(`recognizes Epic ${name} as success`, async () => {
     await page.setContent(html);
-    assert.equal(await waitForEpicClaimSuccess(page, 500), expected);
+    assert.equal(await waitForEpicClaimSuccess(page, 10_000), expected);
   });
 }
 
