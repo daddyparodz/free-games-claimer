@@ -1,36 +1,73 @@
-# https://github.com/marketplace/actions/super-linter#get-started
-name: Lint
-
-on: # yamllint disable-line rule:truthy
-  push: null
-  pull_request: null
-
+name: Native image validation
+on:
+  workflow_dispatch:
 permissions: {}
-
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: read
-      # To report GitHub Actions status checks
-      statuses: write
-
+  probe:
+    if: github.actor == 'daddyparodz' && github.repository == 'daddyparodz/free-games-claimer'
+    runs-on: [self-hosted, Linux, X64]
+    container:
+      image: node:24-bookworm
+    timeout-minutes: 6
+    env:
+      DOCKER_BUILD_SUMMARY: 'false'
+      DOCKER_BUILD_RECORD_UPLOAD: 'false'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Install client
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+          chmod a+r /etc/apt/keyrings/docker.asc
+          printf 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable\n' > /etc/apt/sources.list.d/docker.list
+          apt-get update
+          apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
+      - name: Verify endpoint and prepare context
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'endpoint=%s runner=%s run=%s attempt=%s\n' "${DOCKER_HOST:-unix:///var/run/docker.sock}" "$RUNNER_NAME" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+          case "${DOCKER_HOST:-unix:///var/run/docker.sock}" in unix:///var/run/docker.sock|unix:///run/ghr/rootless-jobs/[0-9]*/docker.sock) ;; *) exit 64;; esac
+          docker info --format '{{json .SecurityOptions}}' | tee security.txt
+          grep -q name=rootless security.txt
+          docker info --format 'id={{.ID}} name={{.Name}} root={{.DockerRootDir}} arch={{.Architecture}}'
+          docker ps --format '{{.ID}} {{.Image}}'
+          docker buildx inspect default | tee builder.txt
+          grep -Eq '^Driver:[[:space:]]+docker$' builder.txt
+          mkdir -p proof-context
+          printf '%s\n' 'FROM alpine:3.22' 'RUN test "$(uname -m)" = x86_64 && printf "AMD64-RUN-PROOF\n" > /proof' > proof-context/Dockerfile
+          sha256sum proof-context/Dockerfile
+      - name: Build native image
+        id: build
+        uses: docker/build-push-action@v6
         with:
-          # super-linter needs the full git history to get the
-          # list of files that changed across commits
-          fetch-depth: 0
-
-      - name: Super-linter
-        uses: super-linter/super-linter/slim@v7.4.0 # x-release-please-version
-        # TODO need to create problem matchers for each linter? https://github.com/rhysd/actionlint/blob/v1.7.7/docs/usage.md#problem-matchers
+          builder: default
+          context: ./proof-context
+          platforms: linux/amd64
+          push: false
+          load: true
+          provenance: false
+          tags: native-amd64-proof:validation
+      - name: Verify native execution and image identity
+        shell: bash
         env:
-          # To report GitHub Actions status checks
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  # TODO automatically fix linting issues and commit them for PRs
-  # fix-lint-issues: # https://github.com/marketplace/actions/super-linter#github-actions-workflow-example-pull-request
+          BUILT_IMAGE_ID: ${{ steps.build.outputs.imageid }}
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect native-amd64-proof:validation --format '{{.Os}}/{{.Architecture}}')" = linux/amd64
+          test "$(docker image inspect native-amd64-proof:validation --format '{{.Id}}')" = "$BUILT_IMAGE_ID"
+          docker run --rm native-amd64-proof:validation sh -ec 'test "$(cat /proof)" = AMD64-RUN-PROOF; cat /proof; sha256sum /proof'
+          printf 'imageid=%s digest=%s\n' "$BUILT_IMAGE_ID" "$BUILT_DIGEST"
+      - name: Cleanup owned image
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v docker >/dev/null; then
+            docker image rm native-amd64-proof:validation || true
+            test -z "$(docker image ls -q native-amd64-proof:validation)"
+          fi
