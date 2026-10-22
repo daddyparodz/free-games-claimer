@@ -32,9 +32,11 @@ test('refuses checkout unless every displayed monetary amount is zero', async ()
 test('waits for user-completed CAPTCHA without interacting with the challenge', async () => {
  const { waitForEpicManualChallenge } = await import('../src/epic-purchase.js');
  await page.setContent('<iframe title="hCaptcha challenge"></iframe>');
- await page.evaluate(()=>setTimeout(()=>document.querySelector('iframe').remove(),150));
  let notified=0;
- await waitForEpicManualChallenge(page,1000,()=>{notified++;});
+ await waitForEpicManualChallenge(page,1000,async()=>{
+   notified++;
+   await page.locator('iframe[title="hCaptcha challenge"]').evaluate(frame => frame.remove());
+ });
  assert.equal(notified,1);
 });
 

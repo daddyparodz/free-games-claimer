@@ -34,8 +34,12 @@ async function checkRestart(restoreSession) {
         return res.end('Sign-in disabled');
       }
       signInIssuances++;
-      res.setHeader('Set-Cookie', ['fixture_sso=original-sso; HttpOnly; Path=/', 'fixture_product=initial-product; Max-Age=3; HttpOnly; Path=/']);
+      res.setHeader('Set-Cookie', ['fixture_sso=original-sso; HttpOnly; Path=/', 'fixture_product=initial-product; Max-Age=60; HttpOnly; Path=/']);
       return res.end('Signed in');
+    }
+    if (req.url === '/expire-product') {
+      res.setHeader('Set-Cookie', 'fixture_product=initial-product; Max-Age=1; HttpOnly; Path=/');
+      return res.end('Product expiry armed');
     }
     if (req.url === '/inert/first' || req.url === '/inert/second') return res.end('Inert saved tab');
     if (req.url === '/product') {
@@ -79,6 +83,11 @@ async function checkRestart(restoreSession) {
       assert.ok(context.pages().every(tab => new URL(tab.url()).pathname.startsWith('/inert/')));
       assert.equal(signInIssuances, 1);
       assert.equal(loginRequests, 0);
+      // Arm expiry only after setup has completed, not during parallel startup.
+      const expiryResponse = await context.request.get(`${base}/expire-product`);
+      assert.equal(expiryResponse.status(), 200);
+      await expiryResponse.dispose();
+      initialProductExpiry = (await context.cookies(base)).find(c => c.name === 'fixture_product').expires;
     }); // withBrowser closes the context gracefully.
     const waitMs = Math.max(0, initialProductExpiry * 1000 - Date.now() + 1100);
     assert.ok(waitMs <= 6000, 'expiry wait must remain bounded');
@@ -132,7 +141,10 @@ async function checkRestart(restoreSession) {
       assert.equal(signInIssuances, 1);
     });
   } finally {
-    await new Promise(resolve => server.close(resolve));
+    await new Promise(resolve => {
+      server.close(resolve);
+      server.closeAllConnections();
+    });
     await rm(profile, { recursive: true, force: true });
   }
 }
