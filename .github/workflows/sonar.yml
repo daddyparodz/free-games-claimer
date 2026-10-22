@@ -13,7 +13,8 @@ permissions:
 
 jobs:
   sonarcloud:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
+    container: node:24-bookworm
     steps:
     -
       uses: actions/checkout@v4
@@ -33,7 +34,7 @@ jobs:
       run: npx eslint . -f json -o eslint_report.json
     -
       name: Fix ESLint paths
-      run: sed -i 's+/home/runner/work/free-games-claimer/free-games-claimer+/github/workspace+g' eslint_report.json
+      run: node -e "const fs = require('fs'); const report = JSON.parse(fs.readFileSync('eslint_report.json')); for (const file of report) file.filePath = '/github/workspace/' + require('path').relative(process.cwd(), file.filePath); fs.writeFileSync('eslint_report.json', JSON.stringify(report));"
     -
       name: SonarCloud Scan
       uses: sonarsource/sonarcloud-github-action@master
