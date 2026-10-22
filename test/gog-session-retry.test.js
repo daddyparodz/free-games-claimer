@@ -1,4 +1,4 @@
-/* global globalThis */
+/* eslint-env es2021 */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getGogSession } from '../src/page-state.js';

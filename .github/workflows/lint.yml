@@ -35,5 +35,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The pinned Super-linter uses a legacy YAML config, including JSON rules.
           ESLINT_USE_FLAT_CONFIG: 'false'
+          # Standard forbids the semicolons and trailing commas required by our
+          # existing ESLint and Prettier rules. Keep those canonical style checks;
+          # leave all other default lint, security, format and clone checks on.
+          VALIDATE_JAVASCRIPT_STANDARD: 'false'
   # TODO automatically fix linting issues and commit them for PRs
   # fix-lint-issues: # https://github.com/marketplace/actions/super-linter#github-actions-workflow-example-pull-request

@@ -12,11 +12,17 @@ for (const name of ['lint', 'sonar']) {
     assert.match(source, /fetch-depth: 0/);
     if (name === 'lint') {
       assert.match(source, /ESLINT_USE_FLAT_CONFIG: 'false'/);
-      assert.doesNotMatch(source, /VALIDATE_\w+: (?:false|'false')/);
+      const validators = [...source.matchAll(/^\s+(VALIDATE_\w+):\s*([^\n#]+)/gm)];
+      // No true allowlist: every other default validator remains enabled.
+      assert.deepEqual(
+        validators.map(([, key, value]) => [key, value.trim().replaceAll(/['"]/g, '')]),
+        [['VALIDATE_JAVASCRIPT_STANDARD', 'false']],
+      );
+      assert.doesNotMatch(source, /FILTER_REGEX_EXCLUDE|DISABLE_ERRORS|JAVASCRIPT_ES_CONFIG_FILE|JSCPD_CONFIG_FILE/);
     }
     assert.match(
       source,
-      name == 'lint' ? /super-linter\/super-linter\/slim@v7\.4\.0/ : /sonarsource\/sonarcloud-github-action@master/,
+      name === 'lint' ? /super-linter\/super-linter\/slim@v7\.4\.0/ : /sonarsource\/sonarcloud-github-action@master/,
     );
   });
 }

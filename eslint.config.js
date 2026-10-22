@@ -13,6 +13,10 @@ export default [
   },
   js.configs.recommended, // TODO still needed?
   {
+    files: ['test/epic-purchase.test.js'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     // files: ['*.js'],
     languageOptions: {
       globals: globals.node,
