@@ -7,6 +7,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import vm from 'node:vm';
 import { chromium } from 'patchright';
 import { withBrowser } from '../src/browser-lifecycle.js';
+import { initialBrowserPage } from '../src/browser-page.js';
 
 async function checkRestart(restoreSession) {
   const source = await readFile(new URL('../epic-games.js', import.meta.url), 'utf8');
@@ -15,9 +16,7 @@ async function checkRestart(restoreSession) {
   assert.ok(productionArgs.includes('--restore-last-session'));
   // Negative control changes only parsed test arguments, never production code.
   const args = restoreSession ? productionArgs : productionArgs.filter(arg => arg !== '--restore-last-session');
-  const selection = source.match(
-    /const page = (context\.pages\(\)\.length \? context\.pages\(\)\[0\] : await context\.newPage\(\));/,
-  );
+  const selection = source.includes('const page = await initialBrowserPage(context, cfg);');
   assert.ok(selection, 'exercise production startup page selection');
   let allowSignIn = true;
   let signInRequests = 0;
@@ -98,6 +97,7 @@ async function checkRestart(restoreSession) {
       await expiryResponse.dispose();
       initialProductExpiry = (await context.cookies(base)).find(c => c.name === 'fixture_product').expires;
     }); // withBrowser closes the context gracefully.
+
     const waitMs = Math.max(0, initialProductExpiry * 1000 - Date.now() + 1100);
     assert.ok(waitMs <= 6000, 'expiry wait must remain bounded');
     await new Promise(resolve => setTimeout(resolve, waitMs));
@@ -134,7 +134,7 @@ async function checkRestart(restoreSession) {
       assert.equal(loginRequests, 0, 'startup must not renew cookies before navigation');
       const firstPage = context.pages()[0];
       const pageCount = context.pages().length;
-      const page = await vm.runInNewContext(`(async () => (${selection[1]}))()`, { context });
+      const page = await initialBrowserPage(context, { width: 1280, height: 720 });
       assert.equal(page, firstPage, 'production selection reuses first existing page');
       assert.equal(context.pages().length, pageCount, 'startup must not create another tab');
       const response = await page.goto(`${base}/product`);

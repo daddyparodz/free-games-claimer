@@ -22,13 +22,16 @@ export const cfg = {
   novnc_port: process.env.NOVNC_PORT, // running in docker if set
   notify: process.env.NOTIFY, // apprise notification services
   notify_title: process.env.NOTIFY_TITLE, // apprise notification title
-  get dir() { // avoids ReferenceError: Cannot access 'dataDir' before initialization
+  get dir() {
+    // avoids ReferenceError: Cannot access 'dataDir' before initialization
     return {
       browser: process.env.BROWSER_DIR || dataDir('browser'), // for multiple accounts or testing
       screenshots: process.env.SCREENSHOTS_DIR || dataDir('screenshots'), // set to 0 to disable screenshots
     };
   },
-  get epic_browser_dir() { return process.env.BROWSER_DIR || dataDir('browser-epic-chromium'); },
+  get epic_browser_dir() {
+    return process.env.BROWSER_DIR || dataDir('browser-epic-chromium');
+  },
   // auth epic-games
   eg_email: process.env.EG_EMAIL || process.env.EMAIL,
   eg_password: process.env.EG_PASSWORD || process.env.PASSWORD,

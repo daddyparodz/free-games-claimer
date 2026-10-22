@@ -50,6 +50,7 @@ test('claim records require fresh independent library readback', async () => {
     source
       .replace(/\r\n/g, '\n')
       .replace(/\n[ \t]*/g, '\n')
+      .replace(/\n(?=\.)/g, '')
       .includes(
         `await page.goto(url);\nawait page.getByRole(${String.fromCharCode(39)}button${String.fromCharCode(39)}, { name: /^In Library$/i }).waitFor`,
       ),
