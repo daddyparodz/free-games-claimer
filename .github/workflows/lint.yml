@@ -33,5 +33,7 @@ jobs:
         env:
           # To report GitHub Actions status checks
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The pinned Super-linter uses a legacy YAML config, including JSON rules.
+          ESLINT_USE_FLAT_CONFIG: 'false'
   # TODO automatically fix linting issues and commit them for PRs
   # fix-lint-issues: # https://github.com/marketplace/actions/super-linter#github-actions-workflow-example-pull-request

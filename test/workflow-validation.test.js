@@ -10,6 +10,13 @@ for (const name of ['lint', 'sonar']) {
     assert.match(source, /pull_request:/);
     assert.doesNotMatch(source, /\/home\/runner\/work/);
     assert.match(source, /fetch-depth: 0/);
-    assert.match(source, name == 'lint' ? /super-linter\/super-linter\/slim@v7\.4\.0/ : /sonarsource\/sonarcloud-github-action@master/);
+    if (name === 'lint') {
+      assert.match(source, /ESLINT_USE_FLAT_CONFIG: 'false'/);
+      assert.doesNotMatch(source, /VALIDATE_\w+: (?:false|'false')/);
+    }
+    assert.match(
+      source,
+      name == 'lint' ? /super-linter\/super-linter\/slim@v7\.4\.0/ : /sonarsource\/sonarcloud-github-action@master/,
+    );
   });
 }

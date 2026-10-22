@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-for (const [branch, tag] of [['main', 'latest'], ['dev', 'dev']]) {
+for (const [branch, tag] of [
+  ['main', 'latest'],
+  ['dev', 'dev'],
+]) {
   test(`Docker metadata preserves ${branch} with a spaced environment path`, () => {
     const workflow = readFileSync(new URL('../.github/workflows/docker.yml', import.meta.url), 'utf8');
     const block = workflow.match(/ {8}run: \|\r?\n((?: {10}.*\r?\n)+)/)?.[1];
