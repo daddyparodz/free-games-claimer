@@ -123,7 +123,9 @@ for (const retryAfter of [
       callback();
     });
     let calls = 0;
-    const context = { request: { get: async () => response(++calls === 1 ? 503 : 200, { 'retry-after': retryAfter }) } };
+    const context = {
+      request: { get: async () => response(++calls === 1 ? 503 : 200, { 'retry-after': retryAfter }) },
+    };
     await getGogSession(context, 100);
     assert.deepEqual(delays, [0]);
     assert.equal(calls, 2);
@@ -144,7 +146,9 @@ for (const retryAfter of [
     });
     const delays = mockClock(t);
     let calls = 0;
-    const context = { request: { get: async () => response(++calls === 1 ? 503 : 200, { 'retry-after': retryAfter }) } };
+    const context = {
+      request: { get: async () => response(++calls === 1 ? 503 : 200, { 'retry-after': retryAfter }) },
+    };
     await getGogSession(context, 5000);
     assert.deepEqual(delays, [2000]);
     assert.equal(calls, 2);
