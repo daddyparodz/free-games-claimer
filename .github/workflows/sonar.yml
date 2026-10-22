@@ -6,7 +6,7 @@ on:
     branches:
       - main
   pull_request:
-      types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -16,28 +16,22 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     container: node:24-bookworm
     steps:
-    -
-      uses: actions/checkout@v4
-      with:
-        # Disabling shallow clone is recommended for improving relevancy of reporting. Otherwise sonarcloud will show a warning.
-        fetch-depth: 0
-    -
-      uses: actions/setup-node@v4
-      with:
-        cache: 'npm'
-    -
-      name: Install dev dependencies which includde ESLint + plugins
-      run: npm install --only=dev
-    -
-      name: Run ESLint
-      continue-on-error: true
-      run: npx eslint . -f json -o eslint_report.json
-    -
-      name: Fix ESLint paths
-      run: node -e "const fs = require('fs'); const report = JSON.parse(fs.readFileSync('eslint_report.json')); for (const file of report) file.filePath = '/github/workspace/' + require('path').relative(process.cwd(), file.filePath); fs.writeFileSync('eslint_report.json', JSON.stringify(report));"
-    -
-      name: SonarCloud Scan
-      uses: sonarsource/sonarcloud-github-action@master
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          # Disabling shallow clone is recommended for improving relevancy of reporting. Otherwise sonarcloud will show a warning.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          cache: 'npm'
+      - name: Install dev dependencies which includde ESLint + plugins
+        run: npm install --only=dev
+      - name: Run ESLint
+        continue-on-error: true
+        run: npx eslint . -f json -o eslint_report.json
+      - name: Fix ESLint paths
+        run: node -e "const fs = require('fs'); const report = JSON.parse(fs.readFileSync('eslint_report.json')); for (const file of report) file.filePath = '/github/workspace/' + require('path').relative(process.cwd(), file.filePath); fs.writeFileSync('eslint_report.json', JSON.stringify(report));"
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
