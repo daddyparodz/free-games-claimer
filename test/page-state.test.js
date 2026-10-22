@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { firefox } from 'playwright-firefox';
-import { getGogSession, isPrimeInternalClaimSuccess, waitForEpicClaimSuccess, waitForGogSession, waitForPrimeInternalClaimSuccess } from '../src/page-state.js';
+import {
+  getGogSession,
+  isPrimeInternalClaimSuccess,
+  waitForEpicClaimSuccess,
+  waitForGogSession,
+  waitForPrimeInternalClaimSuccess,
+} from '../src/page-state.js';
 
 let browser;
 let page;

@@ -11,7 +11,9 @@ for (const [branch, tag] of [
 ]) {
   test(`Docker metadata preserves ${branch} with a spaced environment path`, () => {
     const workflow = readFileSync(new URL('../.github/workflows/docker.yml', import.meta.url), 'utf8');
-    const block = workflow.match(/ {8}run: \|\r?\n((?: {10}.*\r?\n)+)/)?.[1];
+    const block = workflow.match(
+      /name: Set environment variables\r?\n {8}shell: bash\r?\n {8}run: \|\r?\n((?: {10}.*\r?\n)+)/,
+    )?.[1];
     assert.ok(block, 'metadata shell must be present');
     const directory = mkdtempSync(join(tmpdir(), 'fgc-metadata-'));
     try {

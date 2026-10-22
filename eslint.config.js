@@ -66,7 +66,10 @@ export default [
       '@stylistic/js/semi-spacing': 'error',
       '@stylistic/js/semi-style': 'error',
       '@stylistic/js/space-before-blocks': 'error',
-      '@stylistic/js/space-before-function-paren': ['error', { anonymous: 'never', named: 'never', asyncArrow: 'always' }],
+      '@stylistic/js/space-before-function-paren': [
+        'error',
+        { anonymous: 'never', named: 'never', asyncArrow: 'always' },
+      ],
       '@stylistic/js/space-in-parens': 'error',
       '@stylistic/js/space-infix-ops': 'error',
       '@stylistic/js/space-unary-ops': 'error',
