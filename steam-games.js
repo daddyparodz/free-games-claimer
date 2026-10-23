@@ -1,10 +1,13 @@
+import { firstBrowserPage } from './src/browser-page.js';
+import { logRecordedVideo } from './src/browser-page.js';
 import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdated playwright-extra
 import { jsonDb, prompt } from './src/util.js';
 import { cfg } from './src/config.js';
 
 const db = await jsonDb('steam-games.json', {});
 
-const user = cfg.steam_id || await prompt({ message: 'Enter Steam community id ("View my profile", then copy from URL)' });
+const user =
+  cfg.steam_id || (await prompt({ message: 'Enter Steam community id ("View my profile", then copy from URL)' }));
 
 // using https://github.com/apify/fingerprint-suite worked, but has no launchPersistentContext...
 // from https://github.com/apify/fingerprint-suite/issues/162
@@ -12,8 +15,8 @@ import { FingerprintInjector } from 'fingerprint-injector';
 import { FingerprintGenerator } from 'fingerprint-generator';
 
 const { fingerprint, headers } = new FingerprintGenerator().getFingerprint({
-    devices: ["desktop"],
-    operatingSystems: ["windows"],
+  devices: ['desktop'],
+  operatingSystems: ['windows'],
 });
 
 const context = await firefox.launchPersistentContext(cfg.dir.browser, {
@@ -22,11 +25,11 @@ const context = await firefox.launchPersistentContext(cfg.dir.browser, {
   locale: 'en-US', // ignore OS locale to be sure to have english text for locators -> done via /en in URL
   userAgent: fingerprint.navigator.userAgent,
   viewport: {
-      width: fingerprint.screen.width,
-      height: fingerprint.screen.height,
+    width: fingerprint.screen.width,
+    height: fingerprint.screen.height,
   },
   extraHTTPHeaders: {
-      'accept-language': headers['accept-language'],
+    'accept-language': headers['accept-language'],
   },
 });
 // await stealth(context);
@@ -34,7 +37,7 @@ await new FingerprintInjector().attachFingerprintToPlaywright(context, { fingerp
 
 context.setDefaultTimeout(cfg.debug ? 0 : cfg.timeout);
 
-const page = context.pages().length ? context.pages()[0] : await context.newPage(); // should always exist
+const page = await firstBrowserPage(context);
 
 try {
   await page.goto(`https://steamcommunity.com/id/${user}/games?tab=all`);
@@ -69,5 +72,5 @@ try {
 } finally {
   await db.write(); // write out json db
 }
-if (page.video()) console.log('Recorded video:', await page.video().path());
+await logRecordedVideo(page);
 await context.close();

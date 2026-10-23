@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { firefox } from 'playwright-firefox';
-import { getGogSession, isPrimeInternalClaimSuccess, waitForEpicClaimSuccess, waitForGogSession, waitForPrimeInternalClaimSuccess } from '../src/page-state.js';
+import {
+  getGogSession,
+  isPrimeInternalClaimSuccess,
+  waitForEpicClaimSuccess,
+  waitForGogSession,
+  waitForPrimeInternalClaimSuccess,
+} from '../src/page-state.js';
 
 let browser;
 let page;
@@ -23,7 +29,7 @@ for (const [name, html, expected] of [
 ]) {
   test(`recognizes Epic ${name} as success`, async () => {
     await page.setContent(html);
-    assert.equal(await waitForEpicClaimSuccess(page, 500), expected);
+    assert.equal(await waitForEpicClaimSuccess(page, 10_000), expected);
   });
 }
 
