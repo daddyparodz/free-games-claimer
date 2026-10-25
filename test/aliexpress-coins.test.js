@@ -1,4 +1,3 @@
-/* global document */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { firefox } from 'playwright-firefox';
@@ -54,12 +53,12 @@ test('waits for a delayed daily card then clicks only its Collect control once',
     });
     await page.evaluate(() => {
       setTimeout(() => {
-        document.querySelector('#root').innerHTML =
+        globalThis.document.querySelector('#root').innerHTML =
           '<div id="sign-rewards-list"><div id="sign-main-card">Today 40 coins</div></div><button id="signButton">Collect</button>';
-        document.querySelector('#signButton').onclick = () => {
+        globalThis.document.querySelector('#signButton').onclick = () => {
           globalThis.recordClick();
           setTimeout(() => {
-            document.querySelector('#sign-rewards-list').innerHTML =
+            globalThis.document.querySelector('#sign-rewards-list').innerHTML =
               '<div>Today<br>✓<br>+40</div><div>Tomorrow<br>40</div>';
           }, 50);
         };

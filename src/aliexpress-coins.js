@@ -1,4 +1,3 @@
-/* global document */
 export async function collectDailyCoins(page, { timeout = 15000, dryrun = false } = {}) {
   const state = await waitForCoinState(page, timeout);
   if (state.status === 'collectable' && dryrun) return { ...state, status: 'dryrun' };
@@ -29,15 +28,15 @@ async function waitForCoinState(page, timeout, accepted = ['claimed', 'collectab
 export async function readCoinState(page) {
   return page.evaluate(() => {
     const clean = value => (value || '').replace(/\s+/g, ' ').trim();
-    const body = clean(document.body.innerText);
+    const body = clean(globalThis.document.body.innerText);
     if (/security verification|verify (?:that )?you are human|slide to verify|captcha/i.test(body))
       throw new Error('AliExpress security challenge requires manual completion.');
-    if (document.querySelector('input[type="password"]')) throw new Error('AliExpress sign-in is required.');
-    const cards = [...document.querySelectorAll('#sign-rewards-list > div')].map(e => clean(e.innerText));
+    if (globalThis.document.querySelector('input[type="password"]')) throw new Error('AliExpress sign-in is required.');
+    const cards = [...globalThis.document.querySelectorAll('#sign-rewards-list > div')].map(e => clean(e.innerText));
     const today = cards.find(text => /^Today\b/i.test(text)) || '';
     const tomorrow = cards.find(text => /^Tomorrow\b/i.test(text)) || '';
-    const streak = clean(document.body.innerText).match(/\b\d+\s+days?\s+streak\b/i)?.[0] || '';
-    const button = document.querySelector('#signButton');
+    const streak = clean(globalThis.document.body.innerText).match(/\b\d+\s+days?\s+streak\b/i)?.[0] || '';
+    const button = globalThis.document.querySelector('#signButton');
     const collectable =
       today &&
       button &&
