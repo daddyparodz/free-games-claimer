@@ -36,7 +36,7 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Set environment variables
@@ -49,7 +49,7 @@ jobs:
             echo "IMAGE_TAG=${BRANCH//\//-}" >> "$GITHUB_ENV"
           fi
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           builder: default
           context: .

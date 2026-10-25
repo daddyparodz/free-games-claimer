@@ -9,6 +9,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    cooldown:
+      default-days: 7
     # commit-message:
     #   prefix: "npm"
     #   include: "scope"
@@ -16,6 +18,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    cooldown:
+      default-days: 7
     # commit-message:
     #   prefix: "docker"
     #   include: "scope"
@@ -23,6 +27,8 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
+    cooldown:
+      default-days: 7
     # commit-message:
     #   prefix: "github-actions"
     #   include: "scope"

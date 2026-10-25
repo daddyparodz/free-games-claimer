@@ -14,7 +14,7 @@ test('lint retains automatic validation without exposing write credentials', () 
   assert.doesNotMatch(source, /statuses: write|secrets\.GITHUB_TOKEN|secrets\.SONAR_TOKEN/);
   assert.match(source, /unset GITHUB_TOKEN GH_TOKEN/);
   assert.match(source, /MULTI_STATUS: 'false'/);
-  assert.match(source, /ESLINT_USE_FLAT_CONFIG: 'false'/);
+  assert.match(source, /ESLINT_USE_FLAT_CONFIG: 'true'/);
   const validators = [...source.matchAll(/^\s+(VALIDATE_\w+):\s*([^\n#]+)/gm)];
   // No true allowlist: every other default validator remains enabled.
   assert.deepEqual(
@@ -23,6 +23,33 @@ test('lint retains automatic validation without exposing write credentials', () 
   );
   assert.doesNotMatch(source, /FILTER_REGEX_EXCLUDE|DISABLE_ERRORS|JAVASCRIPT_ES_CONFIG_FILE|JSCPD_CONFIG_FILE/);
   assert.match(source, /super-linter\/super-linter\/slim@47984f49b4e87383eed97890fe2dca6063bbd9c3/);
+});
+
+test('migration pins every workflow action and retains Biome correctness checks', () => {
+  for (const file of ['lint.yml', 'docker.yml']) {
+    const workflow = readFileSync(new URL(`../.github/workflows/${file}`, import.meta.url), 'utf8');
+    const references = [...workflow.matchAll(/uses:\s+([^\s#]+)/g)].map(([, reference]) => reference);
+    assert.ok(references.length > 0);
+    for (const reference of references) assert.match(reference, /^[\w-]+\/[\w./-]+@[a-f0-9]{40}$/);
+  }
+  const biome = JSON.parse(readFileSync(new URL('../biome.json', import.meta.url), 'utf8'));
+  assert.equal(biome.linter.rules.recommended, true);
+  assert.equal(biome.javascript.formatter.enabled, false);
+  assert.equal(biome.json.formatter.trailingCommas, 'none');
+  assert.equal(biome.formatter.indentWidth, 2);
+  assert.equal(biome.formatter.lineWidth, 120);
+  // Prettier owns JavaScript layout. These additions are not legacy semantic rules:
+  // constant loops, assignment expressions, coercion, JS typing comments and forEach returns.
+  assert.deepEqual(biome.linter.rules, {
+    recommended: true,
+    correctness: { noConstantCondition: 'off' },
+    suspicious: {
+      noAssignInExpressions: 'off',
+      noDoubleEquals: 'off',
+      noTsIgnore: 'off',
+      useIterableCallbackReturn: 'off',
+    },
+  });
 });
 
 test('retired upstream Sonar integration has no workflow or orphaned project configuration', () => {

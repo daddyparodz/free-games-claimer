@@ -121,7 +121,7 @@ export const getGogSession = async (context, timeout = 15_000) => {
     let delay = 1000 * 2 ** attempt;
     if (status === 503 && attempt < 2) {
       const retryAfter = response.headers()['retry-after'];
-      if (retryAfter && retryAfter.match(/^\d+$/)) delay = Number(retryAfter) * 1000;
+      if (retryAfter?.match(/^\d+$/)) delay = Number(retryAfter) * 1000;
       else if (retryAfter) {
         const now = Date.now();
         const retryAt = parseHttpDate(retryAfter, now);

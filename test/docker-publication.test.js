@@ -27,7 +27,10 @@ const workflow = readFileSync(new URL('../.github/workflows/docker.yml', import.
 
 test('image validation builds without registry publication or credentials', () => {
   assert.match(workflow, /^name: Build Docker image$/m);
-  assert.match(workflow, /name: Build image\n {8}uses: docker\/build-push-action@v6\n {8}with:/);
+  assert.match(
+    workflow,
+    /name: Build image\n {8}uses: docker\/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6\n {8}with:/,
+  );
   assert.match(workflow, /^ {10}push: false$/m);
   assert.match(workflow, /^ {10}context: \.$/m);
   assert.match(workflow, /^ {10}platforms: linux\/amd64$/m);

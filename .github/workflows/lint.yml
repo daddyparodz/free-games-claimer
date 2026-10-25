@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # super-linter needs the full git history to get the
           # list of files that changed across commits
@@ -41,8 +41,8 @@ jobs:
         env:
           ENABLE_GITHUB_ACTIONS_STEP_SUMMARY: 'true'
           MULTI_STATUS: 'false'
-          # The pinned Super-linter uses a legacy YAML config, including JSON rules.
-          ESLINT_USE_FLAT_CONFIG: 'false'
+          # Use the bundled flat configuration, including JavaScript and JSON rules.
+          ESLINT_USE_FLAT_CONFIG: 'true'
           # Standard forbids the semicolons and trailing commas required by our
           # existing ESLint and Prettier rules. Keep those canonical style checks;
           # leave all other default lint, security, format and clone checks on.
