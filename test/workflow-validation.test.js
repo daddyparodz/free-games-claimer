@@ -22,7 +22,7 @@ test('lint retains automatic validation without exposing write credentials', () 
     [['VALIDATE_JAVASCRIPT_STANDARD', 'false']],
   );
   assert.doesNotMatch(source, /FILTER_REGEX_EXCLUDE|DISABLE_ERRORS|JAVASCRIPT_ES_CONFIG_FILE|JSCPD_CONFIG_FILE/);
-  assert.match(source, /super-linter\/super-linter\/slim@v7\.4\.0/);
+  assert.match(source, /super-linter\/super-linter\/slim@47984f49b4e87383eed97890fe2dca6063bbd9c3/);
 });
 
 test('retired upstream Sonar integration has no workflow or orphaned project configuration', () => {
