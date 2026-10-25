@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # super-linter needs the full git history to get the
           # list of files that changed across commits
@@ -32,17 +32,22 @@ jobs:
       - name: Clear ambient checkout credentials
         shell: bash
         run: |
+          # An empty GH_TOKEN breaks Zizmor; inherited credentials must fail closed.
+          if [[ -v GH_TOKEN ]]; then
+            echo 'Unexpected ambient GitHub credential' >&2
+            exit 1
+          fi
           unset GITHUB_TOKEN GH_TOKEN
-          printf '%s\n' 'GITHUB_TOKEN=' 'GH_TOKEN=' >> "$GITHUB_ENV"
+          printf '%s\n' 'GITHUB_TOKEN=' >> "$GITHUB_ENV"
 
       - name: Super-linter
-        uses: super-linter/super-linter/slim@v7.4.0 # x-release-please-version
+        uses: super-linter/super-linter/slim@47984f49b4e87383eed97890fe2dca6063bbd9c3 # v8.3.1
         # TODO need to create problem matchers for each linter? https://github.com/rhysd/actionlint/blob/v1.7.7/docs/usage.md#problem-matchers
         env:
           ENABLE_GITHUB_ACTIONS_STEP_SUMMARY: 'true'
           MULTI_STATUS: 'false'
-          # The pinned Super-linter uses a legacy YAML config, including JSON rules.
-          ESLINT_USE_FLAT_CONFIG: 'false'
+          # Use the bundled flat configuration, including JavaScript and JSON rules.
+          ESLINT_USE_FLAT_CONFIG: 'true'
           # Standard forbids the semicolons and trailing commas required by our
           # existing ESLint and Prettier rules. Keep those canonical style checks;
           # leave all other default lint, security, format and clone checks on.

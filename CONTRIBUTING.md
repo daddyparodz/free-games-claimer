@@ -1,6 +1,6 @@
 # Contribute
 
-## Building and publishing docker images
+## Building and publishing Docker images
 
 Setup the secrets for DOCKERHUB_USERNAME and [DOCKERHUB_TOKEN](https://hub.docker.com/settings/security) in <https://github.com/YOUR_USERNAME/free-games-claimer/settings/secrets/actions> to be able to run the docker.yml workflows.
 

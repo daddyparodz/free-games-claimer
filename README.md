@@ -29,10 +29,10 @@ Easy option: [install Docker](https://docs.docker.com/get-docker/) (or [podman](
 docker run --rm -it -p 6080:6080 -v fgc:/fgc/data --pull=always ghcr.io/daddyparodz/free-games-claimer
 ```
 
-_This currently gives you a captcha challenge for epic-games. Until [issue #183](https://github.com/vogler/free-games-claimer/issues/183) is fixed, it is recommended to just run `node epic-games` without docker (see below)._
+_This currently gives you a captcha challenge for epic-games. Until [issue #183](https://github.com/vogler/free-games-claimer/issues/183) is fixed, it is recommended to just run `node epic-games` without Docker (see below)._
 
 This will run `node epic-games; node prime-gaming; node gog` - if you only want to claim games for one of the stores, you can override the default command by appending e.g. `node epic-games` at the end of the `docker run` command, or if you want several `bash -c "node epic-games.js; node gog.js"`.
-Data (including json files with claimed games, codes to redeem, screenshots) is stored in the Docker volume `fgc`.
+Data (including JSON files with claimed games, codes to redeem, screenshots) is stored in the Docker volume `fgc`.
 
 <details>
   <summary>I want to run without Docker or develop locally.</summary>
@@ -111,7 +111,7 @@ You can add options directly in the command or put them in a file to load.
 
 You can pass variables using `-e VAR=VAL`, for example `docker run -e EMAIL=foo@bar.baz -e NOTIFY='tgram://bottoken/ChatID' ...` or using `--env-file fgc.env` where `fgc.env` is a file on your host system (see [docs](https://docs.docker.com/engine/reference/commandline/run/#env)).
 You can also `docker cp` your configuration file to `/fgc/data/config.env` in the `fgc` volume to store it with the rest of the data instead of on the host ([example](https://github.com/moby/moby/issues/25245#issuecomment-365980572)).
-If you are using [docker compose](https://docs.docker.com/compose/environment-variables/) (or Portainer etc.), you can put options in the `environment:` section.
+If you are using [Docker compose](https://docs.docker.com/compose/environment-variables/) (or Portainer etc.), you can put options in the `environment:` section.
 
 ##### Without Docker
 
@@ -205,7 +205,7 @@ Can be executed by `npx playwright test`. The test runner has options `--debug` 
 However, this only worked up to the button 'I Agree', and then showed an hcaptcha.
 
 Added [main.captcha.js](https://github.com/vogler/epicgames-claimer/commit/e5ce7916ab6329cfc7134677c4d89c2b3fa3ba97#diff-d18d03e9c407a20e05fbf03cbd6f9299857740544fb6b50d6a70b9c6fbc35831) which uses beta of `playwright-extra@next` and `@extra/recaptcha@next` (from [comment on puppeteer-extra](https://github.com/berstend/puppeteer-extra/pull/303#issuecomment-775277480)).
-However, `playwright-extra` seems to be old and missing `:has-text` selector (fixed [here](https://github.com/vogler/epicgames-claimer/commit/ba97a0e840b65f4476cca18e28d8461b0c703420)) and `page.frameLocator`, so the script did not run without adjustments.
+However, `playwright-extra` seems to be old and missing `:has-text` selector ([selector compatibility fix](https://github.com/vogler/epicgames-claimer/commit/ba97a0e840b65f4476cca18e28d8461b0c703420)) and `page.frameLocator`, so the script did not run without adjustments.
 Also, solving via [2captcha](https://2captcha.com?from=13225256) is a paid service which takes time and may be unreliable.
 
 <!-- Alternative: https://anti-captcha.com -->
