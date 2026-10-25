@@ -1,0 +1,8 @@
+# Keep Linux CI input bytes canonical on Windows without rewriting history.
+*.js text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
