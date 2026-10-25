@@ -1,8 +1,12 @@
 // Accessible names survive Epic's generated CSS classes and removed test IDs.
 // Exact matching deliberately excludes secondary controls such as Add to Cart.
-export const epicPurchaseButton = page => page.getByRole('button', {
-  name: /^(Get|In Library|Requires Base Game|Buy Now|Pre-Purchase|Coming Soon|Unavailable|Not Available|Loading(?:\.{3}|…)?)$/i,
-}).filter({ visible: true }).first();
+export const epicPurchaseButton = page =>
+  page
+    .getByRole('button', {
+      name: /^(Get|In Library|Requires Base Game|Buy Now|Pre-Purchase|Coming Soon|Unavailable|Not Available|Loading(?:\.{3}|…)?)$/i,
+    })
+    .filter({ visible: true })
+    .first();
 
 export const epicCheckoutAuthError = () => 'Complete Epic sign-in in the browser.';
 
@@ -13,16 +17,22 @@ export const ensureEpicProductAccount = async (page, { displayName, loginTimeout
   if (productUrl.origin !== 'https://store.epicgames.com' || !productUrl.pathname.includes('/p/')) {
     throw new Error('Epic product authentication must be checked on a product page.');
   }
-  const readAccount = () => page.evaluate(async () => {
-    const response = await fetch('/proxy/api/account', { credentials: 'include', cache: 'no-store' });
-    if (response.status === 401) return null;
-    if (!response.ok) throw new Error(`Epic product account request failed: HTTP ${response.status}`);
-    const account = await response.json();
-    if (typeof account.id !== 'string' || !account.id || typeof account.displayName !== 'string' || !account.displayName) {
-      throw new Error('Epic product account response did not contain an authenticated identity.');
-    }
-    return { id: account.id, displayName: account.displayName };
-  });
+  const readAccount = () =>
+    page.evaluate(async () => {
+      const response = await fetch('/proxy/api/account', { credentials: 'include', cache: 'no-store' });
+      if (response.status === 401) return null;
+      if (!response.ok) throw new Error(`Epic product account request failed: HTTP ${response.status}`);
+      const account = await response.json();
+      if (
+        typeof account.id !== 'string' ||
+        !account.id ||
+        typeof account.displayName !== 'string' ||
+        !account.displayName
+      ) {
+        throw new Error('Epic product account response did not contain an authenticated identity.');
+      }
+      return { id: account.id, displayName: account.displayName };
+    });
   let account = await readAccount();
   if (!account) {
     // Let Epic resume its own SSO session, or keep its MFA/login visible. Never
@@ -35,7 +45,9 @@ export const ensureEpicProductAccount = async (page, { displayName, loginTimeout
     try {
       // Use the product app's own client/state, not the legacy listing login URL.
       await page.goto(login.href, { waitUntil: 'domcontentloaded' });
-      await page.waitForURL(url => url.origin === productUrl.origin && url.pathname === productUrl.pathname, { timeout: loginTimeout });
+      await page.waitForURL(url => url.origin === productUrl.origin && url.pathname === productUrl.pathname, {
+        timeout: loginTimeout,
+      });
     } catch {
       throw new Error(epicCheckoutAuthError());
     }
@@ -50,7 +62,12 @@ export const ensureEpicProductAccount = async (page, { displayName, loginTimeout
 
 export const isEpicLoginRedirect = page => {
   return page.frames().some(frame => {
-    try { const url = new URL(frame.url()); return url.hostname === 'www.epicgames.com' && url.pathname.startsWith('/id/login'); } catch { return false; }
+    try {
+      const url = new URL(frame.url());
+      return url.hostname === 'www.epicgames.com' && url.pathname.startsWith('/id/login');
+    } catch {
+      return false;
+    }
   });
 };
 
@@ -64,7 +81,8 @@ export const waitForEpicCheckout = async (page, timeout = 60000) => {
       await page.waitForTimeout(Math.min(100, Math.max(1, deadline - Date.now())));
       continue;
     }
-    const checkoutSelector = '#webPurchaseContainer iframe, iframe[title="Checkout"][src^="https://store.epicgames.com/checkout"], iframe[title="Checkout"][src^="/checkout"]';
+    const checkoutSelector =
+      '#webPurchaseContainer iframe, iframe[title="Checkout"][src^="https://store.epicgames.com/checkout"], iframe[title="Checkout"][src^="/checkout"]';
     if (await page.locator(checkoutSelector).first().isVisible()) {
       return page.frameLocator(checkoutSelector).first();
     }
@@ -78,7 +96,7 @@ export const waitForEpicCheckout = async (page, timeout = 60000) => {
 
 export const waitForEpicManualChallenge = async (page, timeout = 600000, onChallenge = () => {}) => {
   const challenge = page.locator('iframe[title="hCaptcha challenge"]').filter({ visible: true }).first();
-  if (!await challenge.isVisible()) return;
+  if (!(await challenge.isVisible())) return;
   await onChallenge();
   try {
     await challenge.waitFor({ state: 'hidden', timeout });
@@ -89,7 +107,9 @@ export const waitForEpicManualChallenge = async (page, timeout = 600000, onChall
 
 export const verifyEpicZeroTotal = async checkout => {
   const text = await checkout.locator('body').innerText();
-  const amounts = [...text.matchAll(/(?:[$€£]\s*([\d.,]+)|([\d.,]+)\s*(?:USD|EUR|GBP|€|£))/g)].map(match => match[1] || match[2]);
+  const amounts = [...text.matchAll(/(?:[$€£]\s*([\d.,]+)|([\d.,]+)\s*(?:USD|EUR|GBP|€|£))/g)].map(
+    match => match[1] || match[2],
+  );
   if (!amounts.length || amounts.some(amount => !/^0+(?:[.,]0+)?$/.test(amount))) {
     throw new Error('Epic checkout zero total could not be verified; refusing to place order.');
   }
@@ -109,11 +129,25 @@ export const submitEpicFreeOrder = async (page, checkout, { timeout = 60000, man
     await waitForEpicManualChallenge(page, manualTimeout);
     deadline += Date.now() - before;
     for (const scope of [checkout, page]) {
-      if (await scope.getByText(/Thanks for your order!|It's all yours/i).first().isVisible().catch(() => false)) return 'order-confirmation';
+      if (
+        await scope
+          .getByText(/Thanks for your order!|It's all yours/i)
+          .first()
+          .isVisible()
+          .catch(() => false)
+      )
+        return 'order-confirmation';
     }
-    if (await page.getByRole('button', { name: /^In Library$/i }).first().isVisible().catch(() => false)) return 'in-library';
+    if (
+      await page
+        .getByRole('button', { name: /^In Library$/i })
+        .first()
+        .isVisible()
+        .catch(() => false)
+    )
+      return 'in-library';
     const accept = checkout.getByRole('button', { name: /^I accept$/i }).first();
-    if (!accepted && await accept.isVisible().catch(() => false)) {
+    if (!accepted && (await accept.isVisible().catch(() => false))) {
       await verifyEpicZeroTotal(checkout);
       await accept.click({ timeout: Math.max(1, deadline - Date.now()) });
       accepted = true;

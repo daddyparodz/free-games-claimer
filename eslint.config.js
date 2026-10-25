@@ -13,6 +13,16 @@ export default [
   },
   js.configs.recommended, // TODO still needed?
   {
+    files: [
+      'epic-games.js',
+      'aliexpress.js',
+      'prime-gaming.js',
+      'test/epic-purchase.test.js',
+      'test/epic-submit.test.js',
+    ],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     // files: ['*.js'],
     languageOptions: {
       globals: globals.node,
@@ -37,13 +47,12 @@ export default [
       '@stylistic/js/comma-style': 'error',
       '@stylistic/js/eol-last': 'error',
       '@stylistic/js/func-call-spacing': 'error',
-      '@stylistic/js/function-paren-newline': ['error', 'consistent'],
-      '@stylistic/js/implicit-arrow-linebreak': 'error',
+
       '@stylistic/js/indent': ['error', 2],
       '@stylistic/js/key-spacing': 'error',
       '@stylistic/js/keyword-spacing': 'error',
       '@stylistic/js/linebreak-style': 'error',
-      '@stylistic/js/no-extra-parens': 'error',
+
       '@stylistic/js/no-extra-semi': 'error',
       '@stylistic/js/no-mixed-spaces-and-tabs': 'error',
       '@stylistic/js/no-multi-spaces': 'error',
@@ -51,18 +60,21 @@ export default [
       '@stylistic/js/no-tabs': 'error',
       '@stylistic/js/no-trailing-spaces': 'error',
       '@stylistic/js/no-whitespace-before-property': 'error',
-      '@stylistic/js/nonblock-statement-body-position': 'error',
+
       '@stylistic/js/object-curly-newline': 'error',
       '@stylistic/js/object-curly-spacing': ['error', 'always'],
       '@stylistic/js/object-property-newline': ['error', { allowAllPropertiesOnSameLine: true }],
       '@stylistic/js/quote-props': ['error', 'as-needed'],
-      '@stylistic/js/quotes': ['error', 'single'],
+
       '@stylistic/js/rest-spread-spacing': 'error',
       '@stylistic/js/semi': 'error',
       '@stylistic/js/semi-spacing': 'error',
       '@stylistic/js/semi-style': 'error',
       '@stylistic/js/space-before-blocks': 'error',
-      '@stylistic/js/space-before-function-paren': ['error', { anonymous: 'never', named: 'never', asyncArrow: 'always' }],
+      '@stylistic/js/space-before-function-paren': [
+        'error',
+        { anonymous: 'never', named: 'never', asyncArrow: 'always' },
+      ],
       '@stylistic/js/space-in-parens': 'error',
       '@stylistic/js/space-infix-ops': 'error',
       '@stylistic/js/space-unary-ops': 'error',
@@ -70,7 +82,14 @@ export default [
       '@stylistic/js/switch-colon-spacing': 'error',
       '@stylistic/js/template-curly-spacing': 'error',
       '@stylistic/js/template-tag-spacing': 'error',
-      '@stylistic/js/wrap-regex': 'error',
+      // Prettier owns these layouts; the canonical legacy config does not enable them.
+      // Keep all semantic rules and the remaining stylistic checks unchanged.
+      '@stylistic/js/no-extra-parens': 'off',
+      '@stylistic/js/implicit-arrow-linebreak': 'off',
+      '@stylistic/js/function-paren-newline': 'off',
+      '@stylistic/js/nonblock-statement-body-position': 'off',
+      '@stylistic/js/quotes': ['error', 'single', { avoidEscape: true }],
+      '@stylistic/js/wrap-regex': 'off',
     },
   },
 ];

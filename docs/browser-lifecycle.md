@@ -26,7 +26,7 @@ check detects configured-profile conflicts before launch and fails closed with
 an explanatory message. Native browser profile locks apply on Unix. A legacy
 unregistered/diagnostic browser must be closed manually; the code does not guess
 ownership from a debugging port. If a profile is shared, choose a dedicated
-`BROWSER_DIR` rather than removing profile lock files.
+`BROWSER_DIR` rather than removing profile lockfiles.
 
 The Windows automation repository calls `node close-browsers.js` **after** its
 exclusive root-run lock and **before** Git sync/dependency work. Concurrent root

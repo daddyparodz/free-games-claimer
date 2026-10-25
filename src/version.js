@@ -3,20 +3,21 @@
 import { log } from 'console';
 import { exec } from 'child_process';
 
-const execp = cmd => new Promise((resolve, reject) => {
-  exec(cmd, (error, stdout, stderr) => {
-    if (stderr) console.error(`stderr: ${stderr}`);
-    // if (stdout) console.log(`stdout: ${stdout}`);
-    if (error) {
-      console.log(`error: ${error.message}`);
-      if (error.message.includes('command not found')) {
-        console.info('Install git to check for updates!');
+const execp = cmd =>
+  new Promise((resolve, reject) => {
+    exec(cmd, (error, stdout, stderr) => {
+      if (stderr) console.error(`stderr: ${stderr}`);
+      // if (stdout) console.log(`stdout: ${stdout}`);
+      if (error) {
+        console.log(`error: ${error.message}`);
+        if (error.message.includes('command not found')) {
+          console.info('Install git to check for updates!');
+        }
+        return reject(error);
       }
-      return reject(error);
-    }
-    resolve(stdout.trim());
+      resolve(stdout.trim());
+    });
   });
-});
 
 // const git_main = () => readFileSync('.git/refs/heads/main').toString().trim();
 
@@ -36,9 +37,11 @@ if (process.env.NOVNC_PORT) {
   // date = await execp('git show -s --format=%ch'); // %ch is same as --date=human (short/relative)
 }
 
-const gh = await (await fetch(`https://api.github.com/repos/daddyparodz/free-games-claimer/commits/${branch}`, {
-  // headers: { accept: 'application/vnd.github.VERSION.sha' }
-})).json();
+const gh = await (
+  await fetch(`https://api.github.com/repos/daddyparodz/free-games-claimer/commits/${branch}`, {
+    // headers: { accept: 'application/vnd.github.VERSION.sha' }
+  })
+).json();
 // log(gh);
 
 log('Local commit:', sha, new Date(date));
