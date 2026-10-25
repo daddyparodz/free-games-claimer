@@ -32,8 +32,13 @@ jobs:
       - name: Clear ambient checkout credentials
         shell: bash
         run: |
+          # An empty GH_TOKEN breaks Zizmor; inherited credentials must fail closed.
+          if [[ -v GH_TOKEN ]]; then
+            echo 'Unexpected ambient GitHub credential' >&2
+            exit 1
+          fi
           unset GITHUB_TOKEN GH_TOKEN
-          printf '%s\n' 'GITHUB_TOKEN=' 'GH_TOKEN=' >> "$GITHUB_ENV"
+          printf '%s\n' 'GITHUB_TOKEN=' >> "$GITHUB_ENV"
 
       - name: Super-linter
         uses: super-linter/super-linter/slim@47984f49b4e87383eed97890fe2dca6063bbd9c3 # v8.3.1

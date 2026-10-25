@@ -13,6 +13,10 @@ test('lint retains automatic validation without exposing write credentials', () 
   assert.match(source, /contents: read/);
   assert.doesNotMatch(source, /statuses: write|secrets\.GITHUB_TOKEN|secrets\.SONAR_TOKEN/);
   assert.match(source, /unset GITHUB_TOKEN GH_TOKEN/);
+  // Zizmor rejects an empty GH_TOKEN; reject inherited credentials instead.
+  assert.doesNotMatch(source, /GH_TOKEN=/);
+  assert.match(source, /if \[\[ -v GH_TOKEN \]\]; then/);
+  assert.match(source, /Unexpected ambient GitHub credential/);
   assert.match(source, /MULTI_STATUS: 'false'/);
   assert.match(source, /ESLINT_USE_FLAT_CONFIG: 'true'/);
   const validators = [...source.matchAll(/^\s+(VALIDATE_\w+):\s*([^\n#]+)/gm)];
