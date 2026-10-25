@@ -40,6 +40,7 @@ jobs:
         # TODO need to create problem matchers for each linter? https://github.com/rhysd/actionlint/blob/v1.7.7/docs/usage.md#problem-matchers
         env:
           ENABLE_GITHUB_ACTIONS_STEP_SUMMARY: 'true'
+          MULTI_STATUS: 'false'
           # The pinned Super-linter uses a legacy YAML config, including JSON rules.
           ESLINT_USE_FLAT_CONFIG: 'false'
           # Standard forbids the semicolons and trailing commas required by our

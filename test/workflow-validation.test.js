@@ -13,6 +13,7 @@ test('lint retains automatic validation without exposing write credentials', () 
   assert.match(source, /contents: read/);
   assert.doesNotMatch(source, /statuses: write|secrets\.GITHUB_TOKEN|secrets\.SONAR_TOKEN/);
   assert.match(source, /unset GITHUB_TOKEN GH_TOKEN/);
+  assert.match(source, /MULTI_STATUS: 'false'/);
   assert.match(source, /ESLINT_USE_FLAT_CONFIG: 'false'/);
   const validators = [...source.matchAll(/^\s+(VALIDATE_\w+):\s*([^\n#]+)/gm)];
   // No true allowlist: every other default validator remains enabled.
