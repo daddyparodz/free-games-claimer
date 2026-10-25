@@ -4,14 +4,13 @@
 <img alt="logo-free-games-claimer" src="https://user-images.githubusercontent.com/493741/214588518-a4c89998-127e-4a8c-9b1e-ee4a9d075715.png" />
 </p>
 
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=vogler_free-games-claimer&metric=code_smells)](https://sonarcloud.io/project/overview?id=vogler_free-games-claimer)
-
 Claims free games periodically on
 
 - <img alt="Epic Games Store" src="https://github.com/user-attachments/assets/82e9e9bf-b6ac-4f20-91db-36d2c8429cb6" width="32" align="middle" /> [Epic Games Store](https://www.epicgames.com/store/free-games)
 - <img alt="Amazon Prime Gaming" src="https://github.com/user-attachments/assets/7627a108-20c6-4525-a1d8-5d221ee89d6e" width="32" align="middle" /> [Amazon Prime Gaming](https://gaming.amazon.com)
 - <img alt="GOG" src="https://github.com/user-attachments/assets/49040b50-ee14-4439-8e3c-e93cafd7c3a5" width="32" align="middle" /> [GOG](https://www.gog.com)
 - <img alt="Unreal Engine" src="https://github.com/user-attachments/assets/3582444b-f23b-448d-bf31-01668cd0313a" width="32" align="middle" /> [Unreal Engine (Assets)](https://www.unrealengine.com/marketplace/en-US/assets?count=20&sortBy=effectiveDate&sortDir=DESC&start=0&tag=4910) ([experimental](https://github.com/vogler/free-games-claimer/issues/44), same login as Epic Games)
+
 <!-- - <img src="https://www.freepnglogos.com/uploads/xbox-logo-picture-png-14.png" width="32"/> [Xbox Live Games with Gold](https://www.xbox.com/en-US/live/gold#gameswithgold) ([experimental](https://github.com/vogler/free-games-claimer/issues/19)) -->
 
 Pull requests welcome :)
@@ -134,6 +133,7 @@ To get the OTP key, it is easiest to follow the store's guide for adding an auth
 - **Epic Games**: visit [password & security](https://www.epicgames.com/account/password), enable 'third-party authenticator app', copy the 'Manual Entry Key' and use it to set `EG_OTPKEY`.
 - **Prime Gaming**: visit Amazon 'Your Account › Login & security', 2-step verification › Manage › Add new app › Can't scan the barcode, copy the bold key and use it to set `PG_OTPKEY`
 - **GOG**: only offers OTP via email
+
 <!-- - **Xbox**: visit [additional security](https://account.live.com/proofs/manage/additional) > Add a new way to sign in or verify > Use an app > Set up a different Authenticator app > I can't scan the bar code > copy the bold key and use it to set `XBOX_OTPKEY` -->
 
 Beware that storing passwords and OTP keys as clear text may be a security risk. Use a unique/generated password! TODO: maybe at least offer to base64 encode for storage.
