@@ -1,3 +1,4 @@
+import { collectDailyCoins } from './src/aliexpress-coins.js';
 import { firstBrowserPage } from './src/browser-page.js';
 import { logRecordedVideo } from './src/browser-page.js';
 import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdated playwright-extra
@@ -111,35 +112,11 @@ await withBrowser(
         return;
       }
 
-      const collect = page.locator('#signButton, button:has-text("Collect")').first();
-      const hasCollectButton = await collect
-        .waitFor({ state: 'visible', timeout: 15 * 1000 })
-        .then(() => true)
-        .catch(() => false);
-      if (hasCollectButton && /collect/i.test(await collect.innerText())) {
-        console.log('Clicking daily coin Collect...');
-        await page.evaluate(() => {
-          const button =
-            document.querySelector('#signButton') ||
-            [...document.querySelectorAll('button')].find(b => /collect/i.test(b.innerText));
-          if (!button) throw new Error('AliExpress Collect button not found.');
-          button.click();
-        });
-        await page.waitForTimeout(5 * 1000);
-      }
-
-      const info = await page.evaluate(() => {
-        const body = document.body.innerText.replace(/\s+/g, ' ').trim();
-        return {
-          streak: body.match(/\d+\s+day streak/i)?.[0],
-          checkin: body.match(/Check in today for:\s*\d+\s*coins/i)?.[0],
-          today: document.querySelector('#sign-main-card')?.innerText?.replace(/\s+/g, ' ').trim(),
-          button: document.querySelector('#signButton')?.innerText?.replace(/\s+/g, ' ').trim(),
-        };
-      });
+      const info = await collectDailyCoins(page, { timeout: Math.min(cfg.timeout, 15000), dryrun: cfg.dryrun });
+      console.log('Daily coins:', info.status);
       console.log('Streak:', info.streak || 'unknown');
-      console.log('Today:', info.today || info.checkin || 'unknown');
-      console.log('Button:', info.button || 'not found');
+      console.log('Today:', info.today);
+      console.log('Next reward:', info.tomorrow);
     };
 
     try {
