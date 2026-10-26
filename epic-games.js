@@ -398,6 +398,19 @@ await withBrowser(
 
           // it then creates an iframe for the purchase
           const iframe = await waitForEpicCheckout(page, cfg.timeout);
+          if (!iframe) {
+            // The initial Get label raced product ownership hydration. Read back
+            // independently and never report an existing entitlement as a claim.
+            await page.goto(url);
+            await ensureEpicProductAccount(page, { displayName: user, loginTimeout: cfg.login_timeout });
+            await page.getByRole('button', { name: /^In Library$/i }).waitFor({ state: 'visible', timeout: cfg.timeout });
+            console.log('  Already in library! Nothing to claim.');
+            notify_game.status = 'existed';
+            db.data[user][game_id].status ||= 'existed';
+            if (db.data[user][game_id].status.startsWith('failed')) db.data[user][game_id].status = 'manual';
+            if (cfg.time) console.timeEnd('claim game');
+            continue;
+          }
           // skip game if unavailable in region, https://github.com/vogler/free-games-claimer/issues/46 TODO check games for account's region
           if ((await iframe.locator(':has-text("unavailable in your region")').count()) > 0) {
             console.error('  This product is unavailable in your region!');

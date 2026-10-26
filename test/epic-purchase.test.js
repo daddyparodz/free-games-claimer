@@ -21,6 +21,19 @@ test('finds current Checkout iframe outside the removed purchase container after
   assert.ok(await waitForEpicCheckout(page, 1000));
 });
 
+test('recognizes late ownership hydration instead of timing out waiting for nonexistent checkout', async () => {
+  await page.setContent('<button>Get</button>');
+  await page.evaluate(() => {
+    document.querySelector('button').onclick = event => {
+      event.target.textContent = 'In Library';
+      event.target.disabled = true;
+    };
+  });
+  await page.getByRole('button', { name: /^Get$/ }).click();
+  const { waitForEpicCheckout } = await import('../src/epic-purchase.js');
+  assert.equal(await waitForEpicCheckout(page, 500), null);
+});
+
 test('refuses checkout unless every displayed monetary amount is zero', async () => {
   const { verifyEpicZeroTotal } = await import('../src/epic-purchase.js');
   for (const text of ['Checkout Bad Cheese €0.00 This is free. Add to library', 'Order Total $0.00']) {

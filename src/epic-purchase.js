@@ -81,6 +81,9 @@ export const waitForEpicCheckout = async (page, timeout = 60000) => {
       await page.waitForTimeout(Math.min(100, Math.max(1, deadline - Date.now())));
       continue;
     }
+    // Ownership can hydrate after Get was read/clicked. No checkout exists for
+    // an already-owned product; the caller must independently verify ownership.
+    if (await page.getByRole('button', { name: /^In Library$/i }).first().isVisible()) return null;
     const checkoutSelector =
       '#webPurchaseContainer iframe, iframe[title="Checkout"][src^="https://store.epicgames.com/checkout"], iframe[title="Checkout"][src^="/checkout"]';
     if (await page.locator(checkoutSelector).first().isVisible()) {
