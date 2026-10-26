@@ -403,7 +403,9 @@ await withBrowser(
             // independently and never report an existing entitlement as a claim.
             await page.goto(url);
             await ensureEpicProductAccount(page, { displayName: user, loginTimeout: cfg.login_timeout });
-            await page.getByRole('button', { name: /^In Library$/i }).waitFor({ state: 'visible', timeout: cfg.timeout });
+            await page
+              .getByRole('button', { name: /^In Library$/i })
+              .waitFor({ state: 'visible', timeout: cfg.timeout });
             console.log('  Already in library! Nothing to claim.');
             notify_game.status = 'existed';
             db.data[user][game_id].status ||= 'existed';
