@@ -12,7 +12,7 @@ test(
   { timeout: 60000 },
   async () => {
     const profile = await mkdtemp(path.join(os.tmpdir(), 'fgc-epic-tabs-'));
-    const server = http.createServer((req, res) => {
+    const server = http.createServer((_req, res) => {
       res.setHeader('Content-Type', 'text/html');
       res.end('<h1>Local fake Epic</h1>');
     });
