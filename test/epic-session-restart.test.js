@@ -7,7 +7,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import vm from 'node:vm';
 import { chromium } from 'patchright';
 import { withBrowser } from '../src/browser-lifecycle.js';
-import { initialBrowserPage } from '../src/browser-page.js';
+import { withEpicPage } from '../src/browser-page.js';
 
 async function checkRestart(restoreSession) {
   const source = await readFile(new URL('../epic-games.js', import.meta.url), 'utf8');
@@ -16,7 +16,7 @@ async function checkRestart(restoreSession) {
   assert.ok(productionArgs.includes('--restore-last-session'));
   // Negative control changes only parsed test arguments, never production code.
   const args = restoreSession ? productionArgs : productionArgs.filter(arg => arg !== '--restore-last-session');
-  const selection = source.includes('const page = await initialBrowserPage(context, cfg);');
+  const selection = /context =>\s*withEpicPage\(context, cfg, async page => \{/.test(source);
   assert.ok(selection, 'exercise production startup page selection');
   let allowSignIn = true;
   let signInRequests = 0;
@@ -132,37 +132,38 @@ async function checkRestart(restoreSession) {
       assert.equal(signInRequests, 1, 'startup must not revisit sign-in');
       assert.equal(signInIssuances, 1, 'sign-in cannot reseed cookies');
       assert.equal(loginRequests, 0, 'startup must not renew cookies before navigation');
-      const firstPage = context.pages()[0];
-      const pageCount = context.pages().length;
-      const page = await initialBrowserPage(context, { width: 1280, height: 720 });
-      assert.equal(page, firstPage, 'production selection reuses first existing page');
-      assert.equal(context.pages().length, pageCount, 'startup must not create another tab');
-      const response = await page.goto(`${base}/product`);
-      assert.equal(loginRequests, 1, 'expired product must make exactly one login request');
-      assert.equal(renewals, restoreSession ? 1 : 0);
-      const finalCookies = await context.cookies(base);
-      const product = finalCookies.find(c => c.name === 'fixture_product');
-      if (restoreSession) {
-        assert.equal(product?.value, 'renewed-product', 'login must issue a distinct replacement cookie');
-        assert.ok(
-          Number.isFinite(product.expires) &&
-            product.expires > Date.now() / 1000 &&
-            product.expires > initialProductExpiry,
-        );
-        const finalSso = finalCookies.find(c => c.name === 'fixture_sso');
-        assert.equal(finalSso?.value, 'original-sso');
-        assert.equal(finalSso.expires, -1);
-        assert.equal(response.status(), 200);
-        assert.equal(await page.locator('body').innerText(), 'Authenticated product');
-        assert.equal(new URL(page.url()).pathname, '/product');
-      } else {
-        assert.equal(product, undefined, 'negative control cannot renew product auth');
-        assert.equal(response.status(), 401);
-        assert.equal(await page.locator('body').innerText(), 'Sign in required');
-        assert.equal(new URL(page.url()).pathname, '/login');
-      }
-      assert.equal(signInRequests, 1);
-      assert.equal(signInIssuances, 1);
+      const restored = context.pages().filter(page => page.url().startsWith(`${base}/inert/`));
+      await withEpicPage(context, { width: 1280, height: 720 }, async page => {
+        assert.ok(!restored.includes(page), 'production selection must not hijack restored pages');
+        const response = await page.goto(`${base}/product`);
+        assert.equal(loginRequests, 1, 'expired product must make exactly one login request');
+        assert.equal(renewals, restoreSession ? 1 : 0);
+        const finalCookies = await context.cookies(base);
+        const product = finalCookies.find(c => c.name === 'fixture_product');
+        if (restoreSession) {
+          assert.equal(product?.value, 'renewed-product', 'login must issue a distinct replacement cookie');
+          assert.ok(
+            Number.isFinite(product.expires) &&
+              product.expires > Date.now() / 1000 &&
+              product.expires > initialProductExpiry,
+          );
+          const finalSso = finalCookies.find(c => c.name === 'fixture_sso');
+          assert.equal(finalSso?.value, 'original-sso');
+          assert.equal(finalSso.expires, -1);
+          assert.equal(response.status(), 200);
+          assert.equal(await page.locator('body').innerText(), 'Authenticated product');
+          assert.equal(new URL(page.url()).pathname, '/product');
+        } else {
+          assert.equal(product, undefined, 'negative control cannot renew product auth');
+          assert.equal(response.status(), 401);
+          assert.equal(await page.locator('body').innerText(), 'Sign in required');
+          assert.equal(new URL(page.url()).pathname, '/login');
+        }
+        assert.equal(signInRequests, 1);
+        assert.equal(signInIssuances, 1);
+      });
+      assert.ok(restored.every(page => !page.isClosed() && page.url().startsWith(`${base}/inert/`)));
+      assert.equal(context.pages().filter(page => page.url().startsWith(`${base}/product`)).length, 0);
     });
   } finally {
     await new Promise(resolve => {

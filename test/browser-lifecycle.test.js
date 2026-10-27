@@ -119,7 +119,8 @@ test('every scheduled claimer scopes all post-launch work for guaranteed cleanup
   for (const name of ['epic-games', 'prime-gaming', 'gog', 'aliexpress']) {
     const source = await readFile(new URL(`../${name}.js`, import.meta.url), 'utf8');
     assert.match(source, /await withBrowser\(/, `${name} bypasses lifecycle`);
-    assert.match(source.trimEnd(), /}\s*,?\s*\);$/, `${name} leaves work outside lifecycle`);
+    const end = name === 'epic-games' ? /}\)\s*,?\s*\);$/ : /}\s*,?\s*\);$/;
+    assert.match(source.trimEnd(), end, `${name} leaves work outside lifecycle`);
   }
 });
 
