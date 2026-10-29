@@ -1,13 +1,12 @@
 import { initialBrowserPage, logRecordedVideo } from './src/browser-page.js';
 import { sameOrNewPage, waitUntilStable } from './src/page-navigation.js';
-import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdated playwright-extra
+import { firefox } from 'playwright-firefox';
 import { authenticator } from 'otplib';
 import chalk from 'chalk';
 import {
   resolve,
   jsonDb,
   datetime,
-  stealth,
   filenamify,
   prompt,
   confirm,
@@ -485,9 +484,6 @@ await withBrowser(
   },
   async context => {
     handleSIGINT(context);
-
-    // TODO test if needed
-    await stealth(context);
 
     if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
 

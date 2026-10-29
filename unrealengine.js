@@ -3,7 +3,7 @@ import { initialBrowserPage, logRecordedVideo } from './src/browser-page.js';
 // TODO This is mostly a copy of epic-games.js
 // New assets to claim every first Tuesday of a month.
 
-import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdated playwright-extra
+import { firefox } from 'playwright-firefox';
 import { authenticator } from 'otplib';
 import path from 'path';
 import { writeFileSync } from 'fs';
@@ -11,7 +11,6 @@ import {
   resolve,
   jsonDb,
   datetime,
-  stealth,
   filenamify,
   prompt,
   notify,
@@ -44,8 +43,6 @@ const context = await firefox.launchPersistentContext(cfg.dir.browser, {
 });
 
 handleSIGINT(context);
-
-await stealth(context);
 
 if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
 

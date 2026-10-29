@@ -52,43 +52,6 @@ export const launchChromium = async options => {
   return context;
 };
 
-export const stealth = async context => {
-  // stealth with playwright: https://github.com/berstend/puppeteer-extra/issues/454#issuecomment-917437212
-  // https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions
-  const enabledEvasions = [
-    'chrome.app',
-    'chrome.csi',
-    'chrome.loadTimes',
-    'chrome.runtime',
-    // 'defaultArgs',
-    'iframe.contentWindow',
-    'media.codecs',
-    'navigator.hardwareConcurrency',
-    'navigator.languages',
-    'navigator.permissions',
-    'navigator.plugins',
-    // 'navigator.vendor',
-    'navigator.webdriver',
-    'sourceurl',
-    // 'user-agent-override', // doesn't work since playwright has no page.browser()
-    'webgl.vendor',
-    'window.outerdimensions',
-  ];
-  const stealth = {
-    callbacks: [],
-    async evaluateOnNewDocument(...args) {
-      this.callbacks.push({ cb: args[0], a: args[1] });
-    },
-  };
-  for (const e of enabledEvasions) {
-    const evasion = await import(`puppeteer-extra-plugin-stealth/evasions/${e}/index.js`);
-    evasion.default().onPageCreated(stealth);
-  }
-  for (const evasion of stealth.callbacks) {
-    await context.addInitScript(evasion.cb, evasion.a);
-  }
-};
-
 // used prompts before, but couldn't cancel prompt
 // alternative inquirer is big (node_modules 29MB, enquirer 9.7MB, prompts 9.8MB, none 9.4MB) and slower
 // open issue: prevents handleSIGINT() to work if prompt is cancelled with Ctrl-C instead of Escape: https://github.com/enquirer/enquirer/issues/372
