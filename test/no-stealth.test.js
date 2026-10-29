@@ -10,7 +10,11 @@ test('normal installation excludes the removed stealth dependency tree', async (
   const removed = ['puppeteer-extra-plugin-stealth', 'puppeteer-extra-plugin-user-preferences', 'deepmerge'];
   for (const name of removed) {
     assert.equal(manifest.dependencies[name], undefined, name);
-    assert.equal(Object.keys(lock.packages).some(key => key.endsWith(`node_modules/${name}`)), false, name);
+    assert.equal(
+      Object.keys(lock.packages).some(key => key.endsWith(`node_modules/${name}`)),
+      false,
+      name,
+    );
   }
 });
 

@@ -29,6 +29,11 @@ export const handleSIGINT = (context = null) =>
     if (context) await context.close(); // in order to save recordings also on SIGINT, we need to disable Playwright's handleSIGINT and close the context ourselves
   });
 
+export const configureBrowserContext = (context, { debug, timeout }) => {
+  handleSIGINT(context);
+  if (!debug) context.setDefaultTimeout(timeout);
+};
+
 export const launchChromium = async options => {
   const { chromium } = await import('playwright-chromium'); // stealth plugin needs no outdated playwright-extra
 

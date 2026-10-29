@@ -12,7 +12,7 @@ import {
   confirm,
   notify,
   html_game_list,
-  handleSIGINT,
+  configureBrowserContext,
 } from './src/util.js';
 import { cfg } from './src/config.js';
 import { withBrowser } from './src/browser-lifecycle.js';
@@ -483,9 +483,7 @@ await withBrowser(
     handleSIGINT: false, // have to handle ourselves and call context.close(), otherwise recordings from above won't be saved
   },
   async context => {
-    handleSIGINT(context);
-
-    if (!cfg.debug) context.setDefaultTimeout(cfg.timeout);
+    configureBrowserContext(context, cfg);
 
     const page = await initialBrowserPage(context, cfg);
     // console.debug('userAgent:', await page.evaluate(() => navigator.userAgent));
