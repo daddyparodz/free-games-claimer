@@ -17,7 +17,11 @@ import {
 } from './src/util.js';
 import { cfg } from './src/config.js';
 import { withBrowser } from './src/browser-lifecycle.js';
-import { isPrimeInternalClaimSuccess, waitForPrimeInternalClaimSuccess } from './src/page-state.js';
+import {
+  isPrimeInternalClaimSuccess,
+  waitForPrimeInternalClaimReady,
+  waitForPrimeInternalClaimSuccess,
+} from './src/page-state.js';
 
 const screenshot = (...a) => resolve(cfg.dir.screenshots, 'prime-gaming', ...a);
 
@@ -147,6 +151,10 @@ const claimInternalOffer = async (page, url) => {
       ].join(', '),
     )
     .first();
+  // DOMContentLoaded precedes Luna's hydrated buy box and ownership state.
+  await waitForPrimeInternalClaimReady(page, action, cfg.timeout).catch(() => {});
+  await throwIfPrimeErrorPage(page);
+  if (await isPrimeInternalClaimSuccess(page)) return 'existed';
   if (!(await action.isVisible().catch(() => false))) return 'failed';
   await action.click();
   await page.waitForLoadState('networkidle').catch(() => {});
