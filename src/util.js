@@ -29,6 +29,11 @@ export const handleSIGINT = (context = null) =>
     if (context) await context.close(); // in order to save recordings also on SIGINT, we need to disable Playwright's handleSIGINT and close the context ourselves
   });
 
+export const configureBrowserContext = (context, { debug, timeout }) => {
+  handleSIGINT(context);
+  if (!debug) context.setDefaultTimeout(timeout);
+};
+
 export const launchChromium = async options => {
   const { chromium } = await import('playwright-chromium'); // stealth plugin needs no outdated playwright-extra
 
@@ -50,43 +55,6 @@ export const launchChromium = async options => {
     ...options,
   });
   return context;
-};
-
-export const stealth = async context => {
-  // stealth with playwright: https://github.com/berstend/puppeteer-extra/issues/454#issuecomment-917437212
-  // https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions
-  const enabledEvasions = [
-    'chrome.app',
-    'chrome.csi',
-    'chrome.loadTimes',
-    'chrome.runtime',
-    // 'defaultArgs',
-    'iframe.contentWindow',
-    'media.codecs',
-    'navigator.hardwareConcurrency',
-    'navigator.languages',
-    'navigator.permissions',
-    'navigator.plugins',
-    // 'navigator.vendor',
-    'navigator.webdriver',
-    'sourceurl',
-    // 'user-agent-override', // doesn't work since playwright has no page.browser()
-    'webgl.vendor',
-    'window.outerdimensions',
-  ];
-  const stealth = {
-    callbacks: [],
-    async evaluateOnNewDocument(...args) {
-      this.callbacks.push({ cb: args[0], a: args[1] });
-    },
-  };
-  for (const e of enabledEvasions) {
-    const evasion = await import(`puppeteer-extra-plugin-stealth/evasions/${e}/index.js`);
-    evasion.default().onPageCreated(stealth);
-  }
-  for (const evasion of stealth.callbacks) {
-    await context.addInitScript(evasion.cb, evasion.a);
-  }
 };
 
 // used prompts before, but couldn't cancel prompt
