@@ -21,6 +21,18 @@ test('recognizes the checked Today card separately from the Tomorrow reward', as
   }
 });
 
+test('recognizes an available Italian mobile reward without confusing it with tomorrow', () =>
+  withFixture('<div>3 giorni di sequenza</div><div id="sign-rewards-list"><div>Oggi 20 monete</div></div><button id="signButton">Raccogli</button>', async page => {
+    const state = await readCoinState(page);
+    assert.equal(state.status, 'collectable');
+    assert.equal(state.streak, '3 giorni di sequenza');
+  }));
+
+test('recognizes Italian mobile check-in cards without claiming again', () =>
+  withFixture('<div id="sign-rewards-list"><div>Oggi ✓ +20</div><div>Domani 25</div></div>', async page => {
+    assert.equal((await readCoinState(page)).status, 'claimed');
+  }));
+
 const claimed =
   '<div>63 days streak</div><div id="sign-rewards-list"><div>Today<br>✓<br>+40</div><div id="sign-main-card">Tomorrow<br>40</div></div>';
 async function withFixture(html, run) {

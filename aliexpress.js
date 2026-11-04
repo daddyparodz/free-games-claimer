@@ -1,4 +1,4 @@
-import { collectDailyCoins } from './src/aliexpress-coins.js';
+import { collectAliExpressCoins, coinPageUrl } from './src/aliexpress-coins.js';
 import { firstBrowserPage } from './src/browser-page.js';
 import { logRecordedVideo } from './src/browser-page.js';
 import { firefox } from 'playwright-firefox'; // stealth plugin needs no outdated playwright-extra
@@ -95,7 +95,7 @@ await withBrowser(
     // copied URLs from AliExpress app on tablet which has menu for the used webview
     const urls = {
       // works with desktop view, but stuck at 100% loading in mobile view:
-      coins: 'https://www.aliexpress.com/p/coin-pc-index/index.html',
+      coins: coinPageUrl,
       // only work with mobile view:
       grow: 'https://m.aliexpress.com/p/ae_fruit/index.html', // firefox: stuck at 60% loading, chrome: loads, but canvas
       gogo: 'https://m.aliexpress.com/p/gogo-match-cc/index.html', // closes firefox?!
@@ -106,13 +106,8 @@ await withBrowser(
 
     const coins = async () => {
       await page.locator('#root').waitFor();
-      const text = await page.locator('body').innerText();
-      if (/Download the AliExpress app|Install app/i.test(text)) {
-        console.log('AliExpress coins page is app-gated; skipping.');
-        return;
-      }
-
-      const info = await collectDailyCoins(page, { timeout: Math.min(cfg.timeout, 15000), dryrun: cfg.dryrun });
+      const { daily: info, tasks } = await collectAliExpressCoins(page, { timeout: cfg.timeout, dryrun: cfg.dryrun });
+      for (const task of tasks) console.log('Coin task:', task.task, task.status, task.reason || '');
       console.log('Daily coins:', info.status);
       console.log('Streak:', info.streak || 'unknown');
       console.log('Today:', info.today);
