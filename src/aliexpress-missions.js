@@ -1,6 +1,12 @@
 // These are disclosed, capped platform missions, not ordinary advertisement clicks.
 const missions = [
-  { title: 'Scopri gli articoli sponsorizzati', group: '2458001', cap: 6, path: '/p/coin-index/recommends.html', kind: 'visit' },
+  {
+    title: 'Scopri gli articoli sponsorizzati',
+    group: '2458001',
+    cap: 6,
+    path: '/p/coin-index/recommends.html',
+    kind: 'visit',
+  },
   { title: 'Sfoglia articoli sorpresa', group: '2462001', cap: 2, path: '/p/coin-index/adclick.html' },
 ];
 
@@ -24,11 +30,12 @@ export async function collectIncentivizedMissions(page, { timeout = 60000, dryru
     const rows = () => page.locator('.e2e_normal_task').filter({ has: page.getByText(mission.title, { exact: true }) });
     const progress = async () => {
       const row = rows();
-      if (await row.count() !== 1) return null;
-      if (await row.locator(`.e2e_normal_task_right[data-groupid="${mission.group}"]`).count() !== 1) return null;
+      if ((await row.count()) !== 1) return null;
+      if ((await row.locator(`.e2e_normal_task_right[data-groupid="${mission.group}"]`).count()) !== 1) return null;
       const text = (await row.innerText({ timeout: time() })).replace(/\s+/g, ' ');
       const count = text.match(/\b(\d+)\s*\/\s*(\d+)\b/);
-      if (!count || Number(count[2]) !== mission.cap || Number(count[1]) > mission.cap || !/\+5\b/.test(text)) return null;
+      if (!count || Number(count[2]) !== mission.cap || Number(count[1]) > mission.cap || !/\+5\b/.test(text))
+        return null;
       return Number(count[1]);
     };
     await check(page);
@@ -54,11 +61,13 @@ export async function collectIncentivizedMissions(page, { timeout = 60000, dryru
       page.on('popup', onPopup);
       try {
         const action = rows().locator('.e2e_normal_task_right_btn');
-        if (!/^(?:Vai|Go)$/i.test((await action.innerText({ timeout: time() })).trim()) || !await action.isEnabled()) break;
+        if (!/^(?:Vai|Go)$/i.test((await action.innerText({ timeout: time() })).trim()) || !(await action.isEnabled()))
+          break;
         await action.click({ timeout: time() });
         const until = Date.now() + 3000;
         while (!opened && page.url() === home && Date.now() < until) {
-          await page.waitForTimeout(50); time();
+          await page.waitForTimeout(50);
+          time();
         }
         const visit = opened || page;
         await visit.waitForURL(url => url.href !== 'about:blank', { timeout: time() });
@@ -71,19 +80,25 @@ export async function collectIncentivizedMissions(page, { timeout = 60000, dryru
           if (!text.includes('Utilizza le monete per gli sconti') || !text.includes('Sponsorizzato')) break;
           const viewedUntil = Date.now() + 2000;
           while (Date.now() < viewedUntil) {
-            await visit.waitForTimeout(100); time();
+            await visit.waitForTimeout(100);
+            time();
           }
         } else {
           const header = visit.locator('[class*="aecoin-productClick-"]');
           await header.waitFor({ timeout: time() });
           const instruction = (await header.innerText({ timeout: time() })).replace(/\s+/g, ' ').trim();
-          if (!instruction.includes('Tocca 3 articoli in questa pagina per guadagnare monete') || !/\+5\b/.test(instruction)) {
+          if (
+            !instruction.includes('Tocca 3 articoli in questa pagina per guadagnare monete') ||
+            !/\+5\b/.test(instruction)
+          ) {
             status = 'skipped';
             break;
           }
           const counter = async () => {
             await check(visit);
-            const match = (await header.innerText({ timeout: time() })).replace(/\s+/g, ' ').match(/\b([0-3])\s*\/\s*3\b/);
+            const match = (await header.innerText({ timeout: time() }))
+              .replace(/\s+/g, ' ')
+              .match(/\b([0-3])\s*\/\s*3\b/);
             return match ? Number(match[1]) : null;
           };
           let count = await counter();
@@ -92,15 +107,19 @@ export async function collectIncentivizedMissions(page, { timeout = 60000, dryru
             const productBefore = new Set(page.context().pages());
             const missionUrl = visit.url();
             // Only cards inside this explicitly incentivized mission are eligible.
-            await visit.locator('.product-list .feeds-discount-card .product-click').nth(item).click({ timeout: time() });
+            await visit
+              .locator('.product-list .feeds-discount-card .product-click')
+              .nth(item)
+              .click({ timeout: time() });
             if (visit.url() !== missionUrl) {
               await visit.locator('body').waitFor({ timeout: time() });
               await check(visit);
               await visit.goBack({ waitUntil: 'domcontentloaded', timeout: time() });
             }
             const finish = Date.now() + Math.min(10000, time());
-            while (await counter() !== item + 1 && Date.now() < finish) {
-              await visit.waitForTimeout(250); time();
+            while ((await counter()) !== item + 1 && Date.now() < finish) {
+              await visit.waitForTimeout(250);
+              time();
             }
             count = await counter();
             for (const tab of page.context().pages()) {
@@ -137,7 +156,12 @@ export async function collectIncentivizedMissions(page, { timeout = 60000, dryru
       }
       if (status !== 'progressed') break;
     }
-    results.push({ task: mission.title, status, progress: `${current}/${mission.cap}`, ...(status === 'skipped' ? { reason: 'no-explicit-incentive-instruction' } : {}) });
+    results.push({
+      task: mission.title,
+      status,
+      progress: `${current}/${mission.cap}`,
+      ...(status === 'skipped' ? { reason: 'no-explicit-incentive-instruction' } : {}),
+    });
   }
   return results;
 }
