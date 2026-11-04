@@ -38,6 +38,10 @@ const primeInternalSuccess = page => {
     .first();
 };
 
+export const waitForPrimeInternalClaimReady = async (page, action, timeout) => {
+  await action.or(primeInternalSuccess(page)).first().waitFor({ state: 'visible', timeout });
+};
+
 export const isPrimeInternalClaimSuccess = async page => {
   return await primeInternalSuccess(page)
     .isVisible()

@@ -22,14 +22,18 @@ test('finds current Checkout iframe outside the removed purchase container after
 });
 
 test('recognizes late ownership hydration instead of timing out waiting for nonexistent checkout', async () => {
-  await page.setContent('<button>Get</button>');
+  // Keep the setup control non-actionable: this test exercises ownership readback,
+  // not pointer actionability. The fixture event must not depend on browser frames.
+  await page.setContent('<button hidden>Get</button>');
   await page.evaluate(() => {
     document.querySelector('button').onclick = event => {
+      event.target.hidden = false;
       event.target.textContent = 'In Library';
       event.target.disabled = true;
     };
   });
-  await page.getByRole('button', { name: /^Get$/ }).click();
+  await page.getByRole('button', { name: /^Get$/, includeHidden: true }).dispatchEvent('click');
+  assert.equal(await page.getByRole('button', { name: /^In Library$/ }).isDisabled(), true);
   const { waitForEpicCheckout } = await import('../src/epic-purchase.js');
   assert.equal(await waitForEpicCheckout(page, 500), null);
 });
