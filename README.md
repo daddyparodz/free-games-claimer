@@ -51,6 +51,15 @@ If you don't want to use Docker for quasi-headless mode, you could run inside a 
 
 </details>
 
+## AliExpress daily check-in
+
+Run `node aliexpress --daily-only` from this checkout to collect and verify only
+its daily Coins check-in, using the configured persistent Firefox profile. This
+skips all optional coin missions and does not run other stores. Set `SHOW=1` to
+show the browser or `DRYRUN=1` to inspect without claiming. The normal
+`node aliexpress` command retains optional mission collection. Do not run either
+command while another claimer owns the same profile.
+
 ## Usage
 
 All scripts start an automated Firefox instance, either with the browser GUI shown or hidden (_headless mode_). By default, you won't see any browser open on your host system.

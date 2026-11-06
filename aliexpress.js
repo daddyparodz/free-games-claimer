@@ -106,7 +106,11 @@ await withBrowser(
 
     const coins = async () => {
       await page.locator('#root').waitFor();
-      const { daily: info, tasks } = await collectAliExpressCoins(page, { timeout: cfg.timeout, dryrun: cfg.dryrun });
+      const { daily: info, tasks } = await collectAliExpressCoins(page, {
+        timeout: cfg.timeout,
+        dryrun: cfg.dryrun,
+        dailyOnly: process.argv.includes('--daily-only'),
+      });
       for (const task of tasks) console.log('Coin task:', task.task, task.status, task.reason || '');
       console.log('Daily coins:', info.status);
       console.log('Streak:', info.streak || 'unknown');

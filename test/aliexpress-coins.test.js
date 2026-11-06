@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { firefox } from 'playwright-firefox';
-import { readCoinState, collectDailyCoins } from '../src/aliexpress-coins.js';
+import { readCoinState, collectDailyCoins, collectAliExpressCoins } from '../src/aliexpress-coins.js';
 
 test('recognizes the checked Today card separately from the Tomorrow reward', async () => {
   const browser = await firefox.launch();
@@ -84,6 +84,53 @@ test('waits for a delayed daily card then clicks only its Collect control once',
     assert.equal(clicks, 1);
   }));
 
+// Captured 2026-11-06 from the official mobile Double11 check-in control.
+// Its parent pulses forever; Playwright's normal click never becomes stable.
+const animatedCheckIn = `
+<style>
+@keyframes aecoin-scale-animation-3dUI9 {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.9); }
+}
+#signButton { width: 124px; height: 41px; }
+.aecoin-checkInBox-3gGck {
+  width: 140px;
+  animation: aecoin-scale-animation-3dUI9 1s cubic-bezier(.36,0,.63,1) infinite;
+}
+</style>
+<div id="sign-rewards-list"><div id="sign-main-card">Oggi 30 Valore 0,27€</div></div>
+<div class="aecoin-checkInBox-3gGck"><button id="signButton">Raccogli</button></div>`;
+
+test('clicks the captured endlessly pulsing mobile check-in once with normal actionability', () =>
+  withFixture('<div id="root"></div>', async page => {
+    let clicks = 0;
+    await page.exposeFunction('recordClick', () => clicks++);
+    await page.evaluate(html => {
+      setTimeout(() => {
+        globalThis.document.querySelector('#root').innerHTML = html;
+        // Fix the phase at each frame so this captured pulse cannot happen to
+        // pass Playwright's stability check near a scale turning point.
+        const animation = globalThis.document.querySelector('.aecoin-checkInBox-3gGck').getAnimations()[0];
+        let frame = 0;
+        const advance = () => {
+          if (animation.playState !== 'running') return;
+          animation.currentTime = frame++ % 2 ? 0 : 500;
+          globalThis.requestAnimationFrame(advance);
+        };
+        globalThis.requestAnimationFrame(advance);
+        globalThis.document.querySelector('#signButton').onclick = event => {
+          if (!event.isTrusted) throw new Error('Claim must use a real pointer action.');
+          globalThis.recordClick();
+          globalThis.document.querySelector('#sign-rewards-list').innerHTML =
+            '<div>Oggi ✓ +30</div><div>Domani 40</div>';
+        };
+      }, 50);
+    }, animatedCheckIn);
+    const result = await collectDailyCoins(page, { timeout: 1500 });
+    assert.equal(result.status, 'claimed');
+    assert.equal(clicks, 1);
+  }));
+
 for (const [name, html] of [
   [
     'disabled control',
@@ -119,6 +166,19 @@ test('does not retry a click whose success is uncertain', () =>
       assert.equal(clicks, 1);
     },
   ));
+
+test('daily-only mode never enters optional coin missions', () =>
+  withFixture(claimed, async page => {
+    // A mission inventory access would mean the daily-only boundary was crossed.
+    const locator = page.locator.bind(page);
+    page.locator = selector => {
+      assert.notEqual(selector, '.e2e_normal_task', 'optional missions must not run');
+      return locator(selector);
+    };
+    const result = await collectAliExpressCoins(page, { timeout: 1000, dailyOnly: true });
+    assert.equal(result.daily.status, 'already-claimed');
+    assert.deepEqual(result.tasks, []);
+  }));
 
 test('dry run leaves the daily control untouched', () =>
   withFixture(
