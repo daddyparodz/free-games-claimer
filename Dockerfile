@@ -10,7 +10,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # Install up-to-date node & npm, deps for virtual screen & noVNC, firefox, pip for apprise.
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y curl=7.81.0-1ubuntu1.30 ca-certificates=20260816ubuntu0.22.04.1 gnupg=2.2.27-3ubuntu2.5 \
+    && apt-get install --no-install-recommends -y curl=7.81.0-1ubuntu1.30 ca-certificates=20260816ubuntu0.22.04.2 gnupg=2.2.27-3ubuntu2.5 \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \

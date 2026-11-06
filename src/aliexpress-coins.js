@@ -9,6 +9,7 @@ export async function collectAliExpressCoins(page, options = {}) {
   if (state.status === 'app-gated')
     return { daily: state, tasks: [{ task: 'coins', status: 'skipped', reason: 'app-only' }] };
   const daily = await collectDailyCoins(page, { ...options, timeout });
+  if (options.dailyOnly) return { daily, tasks: [] };
   // Do not return early for an already-collected main check-in.
   const tasks = await collectFreeCoinTasks(page, { ...options, timeout });
   const missions = await collectIncentivizedMissions(page, { ...options, timeout });
@@ -193,19 +194,41 @@ export async function collectFreeCoinTasks(page, { timeout = 60000, dryrun = fal
 
 export async function collectDailyCoins(page, { timeout = 15000, dryrun = false } = {}) {
   const state = await waitForCoinState(page, timeout);
+  let clicked = false;
   if (state.status === 'collectable' && dryrun) return { ...state, status: 'dryrun' };
   if (state.status === 'collectable') {
-    await page.locator('#signButton').click({ timeout });
-    const after = await waitForCoinState(page, timeout, ['claimed']);
-    if (after.status !== 'claimed')
-      throw new Error('AliExpress daily reward click was not confirmed; no retry was attempted.');
+    const button = page.locator('#signButton');
+    // The mobile campaign pulses the check-in button's parent forever. Pause
+    // only infinite transform animations on this control's ancestor chain;
+    // keep the normal visibility, enabled, stability and hit-target checks.
+    await button.evaluate(control => {
+      for (let element = control; element; element = element.parentElement) {
+        for (const animation of element.getAnimations()) {
+          if (
+            animation.effect?.getTiming().iterations === Infinity &&
+            animation.effect.getKeyframes().some(frame => 'transform' in frame)
+          )
+            animation.pause();
+        }
+      }
+    });
+    const current = await readCoinState(page);
+    if (current.status === 'collectable') {
+      await button.click({ timeout });
+      clicked = true;
+      const after = await waitForCoinState(page, timeout, ['claimed']);
+      if (after.status !== 'claimed')
+        throw new Error('AliExpress daily reward click was not confirmed; no retry was attempted.');
+    } else if (current.status !== 'claimed') {
+      throw new Error('AliExpress daily reward state changed before collection.');
+    }
   } else if (state.status !== 'claimed') {
     throw new Error('AliExpress daily reward state is unrecognized.');
   }
   await page.reload({ waitUntil: 'domcontentloaded' });
   const verified = await waitForCoinState(page, timeout, ['claimed']);
   if (verified.status !== 'claimed') throw new Error('AliExpress daily reward could not be verified after navigation.');
-  return { ...verified, status: state.status === 'claimed' ? 'already-claimed' : 'claimed' };
+  return { ...verified, status: clicked ? 'claimed' : 'already-claimed' };
 }
 
 async function waitForCoinState(page, timeout, accepted = ['claimed', 'collectable']) {
