@@ -61,6 +61,28 @@ test('waits for user-completed CAPTCHA without interacting with the challenge', 
   assert.equal(notified, 1);
 });
 
+test('waits for a manual challenge nested inside the checkout frame', async () => {
+  const { waitForEpicManualChallenge } = await import('../src/epic-purchase.js');
+  await page.setContent('<iframe title="Checkout" srcdoc="&lt;iframe title=&quot;hCaptcha challenge&quot;&gt;&lt;/iframe&gt;"></iframe>');
+  const nested = page.frameLocator('iframe[title="Checkout"]').locator('iframe[title="hCaptcha challenge"]');
+  await nested.waitFor();
+  let notified = 0;
+  await waitForEpicManualChallenge(page, 1000, async () => {
+    notified++;
+    await nested.evaluate(frame => frame.remove());
+  });
+  assert.equal(notified, 1);
+});
+
+test('ignores a detached challenge frame but preserves other visibility errors', async () => {
+  const { waitForEpicManualChallenge } = await import('../src/epic-purchase.js');
+  const failure = new Error('Frame was detached');
+  const candidate = { filter() { return this; }, first() { return this; }, async isVisible() { throw failure; } };
+  const frame = detached => ({ locator: () => candidate, isDetached: () => detached });
+  await waitForEpicManualChallenge({ frames: () => [frame(true)] });
+  await assert.rejects(waitForEpicManualChallenge({ frames: () => [frame(false)] }), error => error === failure);
+});
+
 test('claim records require fresh independent library readback', async () => {
   const source = await readFile(new URL('../epic-games.js', import.meta.url), 'utf8');
   assert.ok(

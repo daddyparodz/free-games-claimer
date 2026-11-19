@@ -104,8 +104,26 @@ export const waitForEpicCheckout = async (page, timeout = 60000) => {
 };
 
 export const waitForEpicManualChallenge = async (page, timeout = 600000, onChallenge = () => {}) => {
-  const challenge = page.locator('iframe[title="hCaptcha challenge"]').filter({ visible: true }).first();
-  if (!(await challenge.isVisible())) return;
+  // Epic can render the security dialog inside its checkout iframe.
+  // Inspect every frame without interacting with or solving the challenge.
+  let challenge;
+  for (const frame of page.frames()) {
+    const candidate = frame.locator('iframe[title="hCaptcha challenge"]').filter({ visible: true }).first();
+    let visible;
+    try {
+      visible = await candidate.isVisible();
+    } catch (error) {
+      // Checkout replaces transient security frames while this snapshot is read.
+      // Ignore only a frame that actually disappeared; preserve other failures.
+      if (frame.isDetached()) continue;
+      throw error;
+    }
+    if (visible) {
+      challenge = candidate;
+      break;
+    }
+  }
+  if (!challenge) return;
   await onChallenge();
   try {
     await challenge.waitFor({ state: 'hidden', timeout });
