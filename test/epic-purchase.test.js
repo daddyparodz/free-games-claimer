@@ -63,7 +63,9 @@ test('waits for user-completed CAPTCHA without interacting with the challenge', 
 
 test('waits for a manual challenge nested inside the checkout frame', async () => {
   const { waitForEpicManualChallenge } = await import('../src/epic-purchase.js');
-  await page.setContent('<iframe title="Checkout" srcdoc="&lt;iframe title=&quot;hCaptcha challenge&quot;&gt;&lt;/iframe&gt;"></iframe>');
+  await page.setContent(
+    '<iframe title="Checkout" srcdoc="&lt;iframe title=&quot;hCaptcha challenge&quot;&gt;&lt;/iframe&gt;"></iframe>',
+  );
   const nested = page.frameLocator('iframe[title="Checkout"]').locator('iframe[title="hCaptcha challenge"]');
   await nested.waitFor();
   let notified = 0;
@@ -77,7 +79,17 @@ test('waits for a manual challenge nested inside the checkout frame', async () =
 test('ignores a detached challenge frame but preserves other visibility errors', async () => {
   const { waitForEpicManualChallenge } = await import('../src/epic-purchase.js');
   const failure = new Error('Frame was detached');
-  const candidate = { filter() { return this; }, first() { return this; }, async isVisible() { throw failure; } };
+  const candidate = {
+    filter() {
+      return this;
+    },
+    first() {
+      return this;
+    },
+    async isVisible() {
+      throw failure;
+    },
+  };
   const frame = detached => ({ locator: () => candidate, isDetached: () => detached });
   await waitForEpicManualChallenge({ frames: () => [frame(true)] });
   await assert.rejects(waitForEpicManualChallenge({ frames: () => [frame(false)] }), error => error === failure);
