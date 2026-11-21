@@ -194,6 +194,7 @@ await withBrowser(
           } else {
             console.log(response);
             status = message;
+            if (message != 'Giveaway has ended') process.exitCode ||= 1;
           }
         }
         db.data[user][title].status ||= status;

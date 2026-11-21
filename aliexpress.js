@@ -112,6 +112,7 @@ await withBrowser(
         dailyOnly: process.argv.includes('--daily-only'),
       });
       for (const task of tasks) console.log('Coin task:', task.task, task.status, task.reason || '');
+      if (tasks.some(task => ['unconfirmed', 'failed'].includes(task.status))) process.exitCode ||= 1;
       console.log('Daily coins:', info.status);
       console.log('Streak:', info.streak || 'unknown');
       console.log('Today:', info.today);
