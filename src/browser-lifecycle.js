@@ -150,7 +150,27 @@ export const withBrowser = async (browserType, profile, options, run) => {
     registered = true;
     await assertProfileAvailable(profile);
     if (cancelled) throw Error('Browser session superseded before launch.');
-    launching = browserType.launchPersistentContext(profile, options);
+    // Saved Windows window geometry can prevent Firefox's idle-startup event.
+    // Explicit dimensions avoid that path without changing the persistent profile.
+    let launchOptions = options;
+    if (process.platform === 'win32' && browserType.name?.() === 'firefox' && options.headless === false) {
+      const args = [...(options.args || [])];
+      for (const [dimension, fallback] of [['width', 1280], ['height', 720]]) {
+        if (!args.some(arg => new RegExp(`^-{1,2}${dimension}(=|$)`).test(arg))) {
+          args.push(`-${dimension}`, String(options.viewport?.[dimension] || fallback));
+        }
+      }
+      launchOptions = {
+        ...options,
+        args,
+        // Occluded Windows windows otherwise stall native pointer delivery.
+        firefoxUserPrefs: {
+          'widget.windows.window_occlusion_tracking.enabled': false,
+          ...options.firefoxUserPrefs,
+        },
+      };
+    }
+    launching = browserType.launchPersistentContext(profile, launchOptions);
     context = await launching;
     if (cancelled) throw Error('Browser session superseded by a new invocation.');
     return await run(context);
