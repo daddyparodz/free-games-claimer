@@ -215,6 +215,11 @@ const redeemStatus = action => {
   return 'claimed';
 };
 
+const redeemResult = (action, redeem_url) => {
+  if (!['redeemed', 'already redeemed'].includes(action)) process.exitCode ||= 1;
+  return { action, status: redeemStatus(action), redeem_url };
+};
+
 const isTerminalRedeemStatus = status => isAlreadyRedeemed(status) || status?.startsWith('failed:');
 
 const notifyGogCaptchaNeeded = async title => {
@@ -292,7 +297,7 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
   if (store == 'legacy games' && isGenericLegacyRedeemUrl(redeem_url)) {
     redeem_action = 'redeem (missing legacy URL)';
     console.error('  Missing game-specific Legacy Games redeem URL; skipping generic legacygames.com page.');
-    return { action: redeem_action, status: redeemStatus(redeem_action), redeem_url };
+    return redeemResult(redeem_action, redeem_url);
   }
   const page2 = await context.newPage();
   try {
@@ -411,7 +416,7 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
           ? 'redeem (legacy page not found)'
           : 'redeem (legacy form missing)';
         console.error(`  Legacy Games redeem form unavailable: ${redeem_action}`);
-        return { action: redeem_action, status: redeemStatus(redeem_action), redeem_url };
+        return redeemResult(redeem_action, redeem_url);
       }
       await coupon.fill(code);
       if (await page2.locator('[name=email]').count()) {
@@ -421,7 +426,7 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
             `prime-gaming: Legacy Games redemption for ${title} needs LG_EMAIL, PG_EMAIL, or EMAIL because the promo form still asks for an email.`,
           ).catch(() => {});
           redeem_action = 'redeem (missing email)';
-          return { action: redeem_action, status: redeemStatus(redeem_action), redeem_url };
+          return redeemResult(redeem_action, redeem_url);
         }
         await page2.fill('[name=email]', cfg.lg_email);
         await page2.fill('[name=email_validate]', cfg.lg_email);
@@ -450,6 +455,7 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
           );
         }
       } catch (error) {
+        process.exitCode ||= 1;
         console.error('  Got error', error);
         redeem_action = 'redeemed?';
         console.log(
@@ -463,7 +469,7 @@ const redeemCode = async (context, store, code, redeem_url = redeem[store], titl
     if (cfg.debug) await page2.pause();
     await page2.close();
   }
-  return { action: redeem_action, status: redeemStatus(redeem_action), redeem_url };
+  return redeemResult(redeem_action, redeem_url);
 };
 
 console.log(datetime(), 'started checking prime-gaming');
@@ -652,6 +658,7 @@ await withBrowser(
           if (db.data[user][title].status?.startsWith('failed:')) db.data[user][title].status = 'claimed';
           else db.data[user][title].status ||= 'claimed';
         } else {
+          process.exitCode ||= 1;
           console.error('  Claim was not confirmed by Prime Gaming!');
           const wasFailed = db.data[user][title].status?.startsWith('failed:');
           db.data[user][title].status = 'failed: claim not confirmed';
@@ -682,6 +689,7 @@ await withBrowser(
         const notify_game = { title, url };
         notify_games.push(notify_game); // status is updated below
         if (await isAccountLinkingRequired(page)) {
+          process.exitCode ||= 1;
           console.error('  Account linking is required to claim this offer!');
           notify_game.status = `failed: need account linking for ${store}`;
           db.data[user][title].status = 'failed: need account linking';
@@ -723,6 +731,7 @@ await withBrowser(
                 await db.write();
               } catch (error) {
                 redeem_action = 'redeem (failed)';
+                process.exitCode ||= 1;
                 console.error('  Redeem failed:', error.message);
                 await db.write();
               }
@@ -786,6 +795,7 @@ await withBrowser(
             game.redeem_url = redeemed.redeem_url;
             await db.write();
           } catch (error) {
+            process.exitCode ||= 1;
             console.error('  Redeem failed:', error.message);
             await db.write();
           }
@@ -872,6 +882,7 @@ await withBrowser(
               unlinked_store = 'epic-games';
             }
             if (unlinked_store) {
+              process.exitCode ||= 1;
               console.error('  Missing account linking:', unlinked_store, url);
               dlc_unlinked[unlinked_store] ??= [];
               dlc_unlinked[unlinked_store].push(title);
@@ -884,6 +895,7 @@ await withBrowser(
             }
             // await page.pause();
           } catch (error) {
+            process.exitCode ||= 1;
             console.error(error);
           } finally {
             await page.goto(URL_CLAIM, { waitUntil: 'domcontentloaded' });
