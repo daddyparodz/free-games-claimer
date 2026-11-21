@@ -155,7 +155,10 @@ export const withBrowser = async (browserType, profile, options, run) => {
     let launchOptions = options;
     if (process.platform === 'win32' && browserType.name?.() === 'firefox' && options.headless === false) {
       const args = [...(options.args || [])];
-      for (const [dimension, fallback] of [['width', 1280], ['height', 720]]) {
+      for (const [dimension, fallback] of [
+        ['width', 1280],
+        ['height', 720],
+      ]) {
         if (!args.some(arg => new RegExp(`^-{1,2}${dimension}(=|$)`).test(arg))) {
           args.push(`-${dimension}`, String(options.viewport?.[dimension] || fallback));
         }
