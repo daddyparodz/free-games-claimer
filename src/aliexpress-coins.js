@@ -105,6 +105,12 @@ export async function collectFreeCoinTasks(page, { timeout = 60000, dryrun = fal
         results.push({ task: title, status: 'skipped', reason: 'unavailable-control' });
         continue;
       }
+      // A lingering mission entry is not confirmation that the daily reward is unclaimed.
+      // Do not retry it or infer completion of a separate bonus from this row.
+      if (/^(?:Daily check-in|Check-in giornaliero)$/i.test(title) && state.status === 'claimed') {
+        results.push({ task: title, status: 'skipped', reason: 'daily-already-claimed' });
+        continue;
+      }
       if (dryrun) {
         results.push({ task: title, status: 'dryrun' });
         continue;

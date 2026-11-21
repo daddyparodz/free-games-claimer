@@ -18,7 +18,7 @@ async function observeTaskClicks(page) {
 
 const row = (title, button = 'Vai', extra = '') =>
   `<div class="e2e_normal_task"><div class="e2e_normal_task_content_title">${title}</div><div class="e2e_normal_task_right" data-groupid="1"><div class="e2e_normal_task_right_btn">${button}</div>${extra}</div></div>`;
-async function fixture(html, run) {
+async function fixture(html, run, { claimed = true } = {}) {
   const browser = await firefox.launch();
   try {
     const page = await browser.newPage();
@@ -27,10 +27,12 @@ async function fixture(html, run) {
       done = true;
     });
     const daily = '<div id="sign-rewards-list"><div>Oggi ✓ +20</div><div>Domani 25</div></div>';
+    const unclaimed =
+      '<div id="sign-rewards-list"><div>Oggi +20</div><div>Domani 25</div></div><button id="signButton">Raccogli</button>';
     await page.context().route('**/*', route =>
       route.fulfill({
         contentType: 'text/html; charset=utf-8',
-        body: done ? daily : /Install App/.test(html) ? html : daily + html,
+        body: done ? daily : /Install App/.test(html) ? html : (claimed ? daily : unclaimed) + html,
       }),
     );
     await page.goto('https://m.it.aliexpress.com/p/coin-index/index.html?allowPromotion=1');
@@ -60,6 +62,32 @@ for (const known of [true, false]) {
     }));
 }
 
+for (const title of ['Check-in giornaliero', 'Daily check-in']) {
+  test(`claimed daily reward does not retry the stale ${title} task`, () =>
+    fixture(row(title) + row('Sfoglia articoli visti di recente'), async page => {
+      let dailyClicks = 0;
+      await page.exposeFunction('recordDailyClick', () => {
+        dailyClicks++;
+      });
+      await page
+        .locator('.e2e_normal_task_right_btn')
+        .first()
+        .evaluate(button => {
+          button.onclick = () => globalThis.recordDailyClick();
+        });
+      await page
+        .locator('.e2e_normal_task_right_btn')
+        .nth(1)
+        .evaluate(button => {
+          button.onclick = () => globalThis.completeTask();
+        });
+      const result = await coins.collectFreeCoinTasks(page, { timeout: 3000 });
+      assert.equal(dailyClicks, 0);
+      assert.deepEqual(result[0], { task: title, status: 'skipped', reason: 'daily-already-claimed' });
+      assert.equal(result[1].status, 'completed');
+    }));
+}
+
 test('every daily execution includes free missions even when check-in was already collected', () =>
   fixture(row('Scopri gli articoli sponsorizzati'), async page => {
     assert.equal(typeof coins.collectAliExpressCoins, 'function');
@@ -69,18 +97,22 @@ test('every daily execution includes free missions even when check-in was alread
   }));
 
 test('dry run, completed controls and cancellation perform no free mission actions', () =>
-  fixture(row('Check-in giornaliero') + row('Sfoglia articoli visti di recente', 'Completato'), async page => {
-    const clicks = await observeTaskClicks(page);
-    const result = await coins.collectFreeCoinTasks(page, { timeout: 2000, dryrun: true });
-    assert.deepEqual(
-      result.map(r => r.status),
-      ['dryrun', 'already-completed'],
-    );
-    const controller = new AbortController();
-    controller.abort(new Error('test cancellation'));
-    await assert.rejects(coins.collectFreeCoinTasks(page, { signal: controller.signal }), /test cancellation/);
-    assert.equal(clicks(), 0);
-  }));
+  fixture(
+    row('Check-in giornaliero') + row('Sfoglia articoli visti di recente', 'Completato'),
+    async page => {
+      const clicks = await observeTaskClicks(page);
+      const result = await coins.collectFreeCoinTasks(page, { timeout: 2000, dryrun: true });
+      assert.deepEqual(
+        result.map(r => r.status),
+        ['dryrun', 'already-completed'],
+      );
+      const controller = new AbortController();
+      controller.abort(new Error('test cancellation'));
+      await assert.rejects(coins.collectFreeCoinTasks(page, { signal: controller.signal }), /test cancellation/);
+      assert.equal(clicks(), 0);
+    },
+    { claimed: false },
+  ));
 
 test('disabled or unknown mission controls are not mistaken for completed rewards', () =>
   fixture(row('Check-in giornaliero', 'Vai') + row('Sfoglia articoli visti di recente', 'Unknown'), async page => {
@@ -113,18 +145,22 @@ test('a misleading safe title cannot enable sponsored or spending controls', () 
   ));
 
 test('uncertain mission completion is not retried', () =>
-  fixture(row('Check-in giornaliero'), async page => {
-    let clicks = 0;
-    await page.exposeFunction('recordOnce', () => {
-      clicks++;
-    });
-    await page.locator('.e2e_normal_task_right_btn').evaluate(button => {
-      button.onclick = () => globalThis.recordOnce();
-    });
-    const result = await coins.collectFreeCoinTasks(page, { timeout: 2000 });
-    assert.equal(result[0].status, 'unconfirmed');
-    assert.equal(clicks, 1);
-  }));
+  fixture(
+    row('Check-in giornaliero'),
+    async page => {
+      let clicks = 0;
+      await page.exposeFunction('recordOnce', () => {
+        clicks++;
+      });
+      await page.locator('.e2e_normal_task_right_btn').evaluate(button => {
+        button.onclick = () => globalThis.recordOnce();
+      });
+      const result = await coins.collectFreeCoinTasks(page, { timeout: 2000 });
+      assert.equal(result[0].status, 'unconfirmed');
+      assert.equal(clicks, 1);
+    },
+    { claimed: false },
+  ));
 
 test('matured order coins claim never confirms delivery or spends boost', () =>
   fixture(
@@ -210,21 +246,25 @@ test('recent items uses only its normal mission entry and verifies disappearance
   }));
 
 test('free daily check-in is scoped, confirmed after reload and idempotent', () =>
-  fixture(row('Check-in giornaliero') + '<button>Buy now</button>', async page => {
-    assert.equal(typeof coins.collectFreeCoinTasks, 'function');
-    let clicks = 0;
-    await page.exposeFunction('clicked', () => {
-      clicks++;
-    });
-    await page.locator('.e2e_normal_task_right_btn').evaluate(button => {
-      button.onclick = () => {
-        globalThis.clicked();
-        globalThis.completeTask();
-        button.closest('.e2e_normal_task').remove();
-      };
-    });
-    const result = await coins.collectFreeCoinTasks(page, { timeout: 1000 });
-    assert.equal(result.find(r => r.task === 'Check-in giornaliero').status, 'completed');
-    await coins.collectFreeCoinTasks(page, { timeout: 1000 });
-    assert.equal(clicks, 1);
-  }));
+  fixture(
+    row('Check-in giornaliero') + '<button>Buy now</button>',
+    async page => {
+      assert.equal(typeof coins.collectFreeCoinTasks, 'function');
+      let clicks = 0;
+      await page.exposeFunction('clicked', () => {
+        clicks++;
+      });
+      await page.locator('.e2e_normal_task_right_btn').evaluate(button => {
+        button.onclick = () => {
+          globalThis.clicked();
+          globalThis.completeTask();
+          button.closest('.e2e_normal_task').remove();
+        };
+      });
+      const result = await coins.collectFreeCoinTasks(page, { timeout: 1000 });
+      assert.equal(result.find(r => r.task === 'Check-in giornaliero').status, 'completed');
+      await coins.collectFreeCoinTasks(page, { timeout: 1000 });
+      assert.equal(clicks, 1);
+    },
+    { claimed: false },
+  ));
